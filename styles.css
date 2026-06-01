@@ -1602,15 +1602,6 @@ h1, h2, h3, h4, h5, h6 {
   display: none;
 }
 
-#home-tile-verwaltung {
-  background-color: #16a34a;
-  border-color: #16a34a;
-}
-#home-tile-verwaltung:hover {
-  background-color: #15803d;
-  border-color: #15803d;
-}
-
 #home-tile-erstellen {
   background-color: #2563eb;
   border-color: #2563eb;
@@ -1629,24 +1620,74 @@ h1, h2, h3, h4, h5, h6 {
   border-color: #6d28d9;
 }
 
-#home-tile-verwaltung .home-tile-title,
 #home-tile-erstellen .home-tile-title,
 #home-tile-einsehen .home-tile-title {
   color: white;
 }
 
-#home-tile-verwaltung .home-tile-desc,
 #home-tile-erstellen .home-tile-desc,
 #home-tile-einsehen .home-tile-desc {
   color: rgba(255, 255, 255, 0.8);
 }
 
-#home-tile-verwaltung .home-tile-icon,
 #home-tile-erstellen .home-tile-icon,
 #home-tile-einsehen .home-tile-icon {
   background-color: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.3);
   color: white;
+}
+
+#home-tile-gespraeche {
+  background-color: #db2777;
+  border-color: #db2777;
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+#home-tile-gespraeche:hover {
+  background-color: #db2777;
+  border-color: #db2777;
+  transform: none;
+  box-shadow: var(--shadow-sm);
+}
+
+#home-tile-gespraeche .home-tile-title {
+  color: white;
+}
+
+#home-tile-gespraeche .home-tile-desc {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.home-tile-kommt-bald {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #db2777;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 3px 10px;
+  border-radius: 99px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.btn-header-verwaltung {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: #2563eb;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+}
+
+.btn-header-verwaltung:hover {
+  background: #1d4ed8;
+  box-shadow: var(--shadow-sm);
 }
 
 #home-tile-erstellen .home-tile-hint {

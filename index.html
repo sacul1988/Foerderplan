@@ -23,6 +23,9 @@
       <div class="logo-badge">FP</div>
       <h1 class="logo-text" id="logo-text">Förderplan · Assistent</h1>
     </div>
+    <button type="button" id="btn-verwaltung-header" class="btn-header-verwaltung" title="Verwaltung">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
   </header>
 
   <!-- Main Container -->
@@ -31,11 +34,6 @@
     <!-- ================= HOME VIEW ================= -->
     <div class="home-view active" id="home-view">
       <div class="home-tiles-grid">
-        <button class="home-tile" id="home-tile-verwaltung" type="button">
-          <div class="home-tile-icon home-tile-icon--verwaltung">V</div>
-          <div class="home-tile-title">Verwaltung</div>
-          <div class="home-tile-desc">Schülerinnen und Schüler anlegen und verwalten</div>
-        </button>
         <button class="home-tile" id="home-tile-erstellen" type="button">
           <div class="home-tile-icon home-tile-icon--erstellen">+</div>
           <div class="home-tile-title">Förderpläne erstellen</div>
@@ -46,6 +44,11 @@
           <div class="home-tile-icon home-tile-icon--einsehen">E</div>
           <div class="home-tile-title">Förderpläne einsehen</div>
           <div class="home-tile-desc">Bestehende Förderpläne ansehen und exportieren</div>
+        </button>
+        <button class="home-tile" id="home-tile-gespraeche" type="button" disabled>
+          <div class="home-tile-title">Förderplangespräche</div>
+          <div class="home-tile-desc">Gesprächsvorbereitung und Dokumentation</div>
+          <span class="home-tile-kommt-bald">Kommt bald</span>
         </button>
       </div>
 
@@ -70,7 +73,6 @@
     <!-- ================= VERWALTUNG SUB-VIEW ================= -->
     <div class="home-view" id="verwaltung-view">
       <div class="subview-header">
-        <button type="button" class="btn-back-circle" id="btn-back-from-verwaltung" title="Zurück zur Startseite">&#8592;</button>
         <h2 class="home-title">Verwaltung</h2>
       </div>
       <div class="home-tiles-grid verwaltung-tiles-grid">

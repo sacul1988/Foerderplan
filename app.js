@@ -389,7 +389,7 @@ const subjectConfig = {
 // --- DOM Elements ---
 const DOM = {
   homeView: document.getElementById('home-view'),
-  homeTileVerwaltung: document.getElementById('home-tile-verwaltung'),
+  homeTileVerwaltung: document.getElementById('btn-verwaltung-header'),
   homeTileErstellen: document.getElementById('home-tile-erstellen'),
   homeTileEinsehen: document.getElementById('home-tile-einsehen'),
   verwaltungView: document.getElementById('verwaltung-view'),
@@ -397,7 +397,6 @@ const DOM = {
   verwaltungTileZeitraum: document.getElementById('verwaltung-tile-zeitraum'),
   verwaltungTileUebersicht: document.getElementById('verwaltung-tile-uebersicht'),
   verwaltungTileArchiv: document.getElementById('verwaltung-tile-archiv'),
-  btnBackFromVerwaltung: document.getElementById('btn-back-from-verwaltung'),
   uebersichtView: document.getElementById('uebersicht-view'),
   btnBackFromUebersicht: document.getElementById('btn-back-from-uebersicht'),
   archivView: document.getElementById('archiv-view'),
@@ -1983,7 +1982,13 @@ function renderStudentDashboardTiles(student) {
 // --- Event Listeners ---
 function setupEventListeners() {
   // Home tiles
-  DOM.homeTileVerwaltung.addEventListener('click', navigateToVerwaltung);
+  DOM.homeTileVerwaltung.addEventListener('click', () => {
+    if (DOM.verwaltungView.classList.contains('active')) {
+      showHomeView();
+    } else {
+      navigateToVerwaltung();
+    }
+  });
   DOM.homeTileErstellen.addEventListener('click', () => {
     if (!DOM.homeTileErstellen.classList.contains('home-tile--locked')) navigateToApp();
   });
@@ -2072,7 +2077,6 @@ function setupEventListeners() {
       DOM.dashboardGrid.classList.remove('hidden');
     }
   });
-  DOM.btnBackFromVerwaltung.addEventListener('click', showHomeView);
 
   // Zeitraum form
   DOM.btnBackFromZeitraum.addEventListener('click', navigateBackFromZeitraum);
@@ -2312,7 +2316,15 @@ function updateHomeTileErstellen() {
   if (aktiv) {
     tile.classList.remove('home-tile--locked');
     desc.style.display = '';
-    hint.style.display = 'none';
+    const fp = zeitraum?.foerderplan || {};
+    if (fp.von || fp.bis) {
+      const vonStr = fp.von ? formatDate(fp.von) : '–';
+      const bisStr = fp.bis ? formatDate(fp.bis) : '–';
+      hint.textContent = `${vonStr} – ${bisStr}`;
+      hint.style.display = '';
+    } else {
+      hint.style.display = 'none';
+    }
   } else {
     tile.classList.add('home-tile--locked');
     desc.style.display = 'none';
