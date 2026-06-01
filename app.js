@@ -1347,6 +1347,60 @@ function renderSubjectDetailContent(student, subject) {
   }).join('');
 }
 
+// --- Shared Helper ---
+function hasPlan(student, subject) {
+  const plans = student.plans[subject] || {};
+  return Object.keys(plans).some(g => {
+    const val = plans[g];
+    return val && (typeof val === 'object' ? val.level > 0 : val > 0);
+  });
+}
+
+// --- Home Übersicht-Panel ---
+function renderHomeUebersicht() {
+  const list = document.getElementById('home-uebersicht-list');
+  const countEl = document.getElementById('home-uebersicht-count');
+  if (!list || !countEl) return;
+
+  const subjects = ['allgemein', 'mathe', 'englisch', 'deutsch'];
+  const subjectLabels = { allgemein: 'Allgemein', mathe: 'Mathe', englisch: 'Englisch', deutsch: 'Deutsch' };
+
+  const incompleteStudents = state.students.filter(s =>
+    !subjects.every(sub => hasPlan(s, sub))
+  );
+
+  if (state.students.length === 0) {
+    countEl.textContent = '';
+    list.innerHTML = `<p class="home-uebersicht-no-students">Noch keine Schüler angelegt.</p>`;
+    return;
+  }
+
+  if (incompleteStudents.length === 0) {
+    countEl.textContent = 'Alle vollständig';
+    list.innerHTML = `<p class="home-uebersicht-all-done">&#10003; Alle Schüler haben vollständige Förderpläne.</p>`;
+    return;
+  }
+
+  countEl.textContent = `${incompleteStudents.length} Schüler mit offenen Plänen`;
+
+  list.innerHTML = incompleteStudents.map(student => {
+    const initials = student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    const missingTags = subjects
+      .filter(sub => !hasPlan(student, sub))
+      .map(sub => `<span class="missing-subject-tag" data-subject="${sub}">${subjectLabels[sub]}</span>`)
+      .join('');
+
+    return `
+      <div class="home-uebersicht-entry">
+        <div class="student-avatar">${escapeHTML(initials)}</div>
+        <div class="home-uebersicht-entry-info">
+          <div class="home-uebersicht-name">${escapeHTML(student.name)}</div>
+          <div class="home-uebersicht-missing">${missingTags}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 // --- Übersicht / Status ---
 function navigateToUebersicht() {
   renderUebersicht();
@@ -1380,13 +1434,6 @@ function renderUebersicht() {
     return;
   }
 
-  function hasPlan(student, subject) {
-    const plans = student.plans[subject] || {};
-    return Object.keys(plans).some(g => {
-      const val = plans[g];
-      return val && (typeof val === 'object' ? val.level > 0 : val > 0);
-    });
-  }
 
   const headerCells = subjects.map(s =>
     `<div class="uebersicht-subject-label" data-subject="${s}">${subjectLabels[s]}</div>`
@@ -1873,6 +1920,7 @@ function navigateBackFromZeitraum() {
 
 function showHomeView() {
   setHeader('Förderplan · Assistent');
+  renderHomeUebersicht();
   DOM.homeView.classList.add('active');
   DOM.verwaltungView.classList.remove('active');
   DOM.schuelerVerwaltungView.classList.remove('active');
@@ -1944,6 +1992,7 @@ function init() {
   renderStudents();
   updateHomeTileErstellen();
   initDatePickers();
+  renderHomeUebersicht();
 }
 
 document.addEventListener('DOMContentLoaded', init);
