@@ -371,7 +371,11 @@ const state = {
   // Selected goal strings for Step 1
   selectedGoals: [],
   // Temporary map used during editing in the workspace (goal: level)
-  editingPlans: {}
+  editingPlans: {},
+  // Stammdaten edit mode
+  stammdatenEditMode: false,
+  // Whether stammdaten were confirmed/saved in current erstellen session
+  stammdatenConfirmed: false
 };
 
 // Subject Config
@@ -1166,6 +1170,8 @@ function saveHistorySnapshot(studentIndex, subject) {
   const now = new Date();
   const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   if (!student.history) student.history = [];
+  // Remove any existing entry for this subject — only one PDF per subject
+  if (subject) student.history = student.history.filter(e => e.subject !== subject);
   const entry = {
     id: Date.now().toString(),
     date: dateStr,
@@ -1210,6 +1216,77 @@ function generateFoerderplan(student, dateStr) {
   doc.setLineWidth(0.4);
   doc.line(margin, y, pageWidth - margin, y);
   y += 8;
+
+  // --- Stammdaten & Zeitraum ---
+  const zeitraumData = loadZeitraum();
+  const schuljahr = zeitraumData.schuljahr || {};
+  const sd = student.stammdaten || {};
+  const _notenLabels = { ja: 'Ja', nein: 'Nein', 'ind-paed': 'Ind.-päd.', esa: 'ESA angestrebt (ab Kl 8)' };
+  const sdRows = [
+    sd.foerderbedarf        ? ['Förderbedarf',         sd.foerderbedarf === 'zielgleich' ? 'Zielgleich' : 'Zieldifferent'] : null,
+    sd.nachteilsausgleich   ? ['Nachteilsausgleich',    sd.nachteilsausgleich === 'ja' ? 'Ja' : 'Nein'] : null,
+    sd.beschulungsjahr      ? ['Beschulungsjahr',       sd.beschulungsjahr] : null,
+    sd.wichtig              ? ['Wichtig',               sd.wichtig] : null,
+    sd.thematischeTeilnahme ? ['Thematische Teilnahme', sd.thematischeTeilnahme === 'ja' ? 'Ja' : 'Nein'] : null,
+    sd.zustaendigkeit       ? ['Zuständigkeit',         sd.zustaendigkeit] : null,
+    sd.noten                ? ['Noten',                 _notenLabels[sd.noten] || sd.noten] : null,
+    sd.bemerkungen          ? ['Bemerkungen',           sd.bemerkungen] : null,
+  ].filter(Boolean);
+
+  let addedMetaContent = false;
+
+  if (sdRows.length > 0) {
+    const pairedRows = [];
+    for (let i = 0; i < sdRows.length; i += 2) {
+      const left = sdRows[i];
+      const right = sdRows[i + 1];
+      pairedRows.push(right
+        ? [left[0], left[1], right[0], right[1]]
+        : [left[0], left[1], '', '']
+      );
+    }
+    doc.autoTable({
+      startY: y,
+      head: [[{ content: 'Stammdaten', colSpan: 4, styles: { fillColor: [30, 41, 59], textColor: [255,255,255], fontStyle: 'bold', fontSize: 9, cellPadding: { top: 4, bottom: 4, left: 5, right: 5 } } }]],
+      body: pairedRows,
+      margin: { left: margin, right: margin },
+      bodyStyles: { fontSize: 8, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 }, valign: 'top' },
+      columnStyles: {
+        0: { cellWidth: 40, fontStyle: 'bold', textColor: [71, 85, 105] },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 40, fontStyle: 'bold', textColor: [71, 85, 105] },
+        3: { cellWidth: 'auto' }
+      },
+      styles: { lineColor: [226, 232, 240], lineWidth: 0.3 },
+      theme: 'grid'
+    });
+    y = doc.lastAutoTable.finalY + 5;
+    addedMetaContent = true;
+  }
+
+  if (schuljahr.name || schuljahr.von || schuljahr.bis) {
+    let zeitraumText = 'Gültig für';
+    if (schuljahr.name) zeitraumText += ` ${schuljahr.name}`;
+    if (schuljahr.von || schuljahr.bis) {
+      zeitraumText += ' im Zeitraum';
+      if (schuljahr.von) zeitraumText += ` ${formatDate(schuljahr.von)}`;
+      if (schuljahr.von && schuljahr.bis) zeitraumText += ' –';
+      if (schuljahr.bis) zeitraumText += ` ${formatDate(schuljahr.bis)}`;
+    }
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(71, 85, 105);
+    doc.text(zeitraumText, margin, y);
+    y += 8;
+    addedMetaContent = true;
+  }
+
+  if (addedMetaContent) {
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.4);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 8;
+  }
 
   const subjectColors = {
     allgemein: [100, 116, 139],
@@ -1361,6 +1438,81 @@ function renderSubjectDetailContent(student, subject) {
 }
 
 // --- Stammdaten ---
+function stammdatenAktualisiert(student) {
+  const sd = student?.stammdaten;
+  if (!sd) return false;
+  return Object.values(sd).some(v => v && v !== '');
+}
+
+function openStammdatenEdit() {
+  const student = state.students.find(s => s.id === state.selectedStudentId);
+  if (!student) return;
+  state.stammdatenEditMode = true;
+
+  document.getElementById('anlegen-name').value = student.name;
+  const sd = student.stammdaten || {};
+  document.querySelectorAll('#schueler-anlegen-view input[type="radio"]').forEach(r => r.checked = false);
+  ['foerderbedarf','nachteilsausgleich','thematische-teilnahme','noten'].forEach(name => {
+    const key = name.replace(/-([a-z])/g, (_, c) => c.toUpperCase()).replace('thematischeTeilnahme', 'thematischeTeilnahme');
+    const sdKey = name === 'foerderbedarf' ? 'foerderbedarf'
+                : name === 'nachteilsausgleich' ? 'nachteilsausgleich'
+                : name === 'thematische-teilnahme' ? 'thematischeTeilnahme'
+                : 'noten';
+    if (sd[sdKey]) {
+      const r = document.querySelector(`input[name="anlegen-${name}"][value="${sd[sdKey]}"]`);
+      if (r) r.checked = true;
+    }
+  });
+  document.getElementById('anlegen-beschulungsjahr').value = sd.beschulungsjahr || '';
+  document.getElementById('anlegen-wichtig').value        = sd.wichtig          || '';
+  document.getElementById('anlegen-zustaendigkeit').value = sd.zustaendigkeit   || '';
+  document.getElementById('anlegen-bemerkungen').value    = sd.bemerkungen      || '';
+
+  const titleEl = document.querySelector('#schueler-anlegen-view .home-title');
+  if (titleEl) titleEl.textContent = 'Stammdaten bearbeiten';
+
+  DOM.studentDashboardView.classList.remove('active');
+  DOM.schuelerAnlegenView.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function saveStammdatenEdit() {
+  const idx = state.students.findIndex(s => s.id === state.selectedStudentId);
+  if (idx === -1) return;
+  const name = document.getElementById('anlegen-name').value.trim();
+  if (!name) { showToast('Bitte einen Namen eingeben.', 'error'); return; }
+
+  const radio = n => document.querySelector(`input[name="${n}"]:checked`)?.value || null;
+  const val   = id => document.getElementById(id)?.value.trim() || '';
+
+  state.students[idx].name = name;
+  state.students[idx].stammdaten = {
+    foerderbedarf:        radio('anlegen-foerderbedarf'),
+    nachteilsausgleich:   radio('anlegen-nachteilsausgleich'),
+    beschulungsjahr:      val('anlegen-beschulungsjahr'),
+    wichtig:              val('anlegen-wichtig'),
+    thematischeTeilnahme: radio('anlegen-thematische-teilnahme'),
+    zustaendigkeit:       val('anlegen-zustaendigkeit'),
+    noten:                radio('anlegen-noten'),
+    bemerkungen:          val('anlegen-bemerkungen'),
+  };
+  state.students[idx].stammdatenConfirmed = true;
+  storage.saveData(state.students);
+  state.stammdatenEditMode = false;
+  state.stammdatenConfirmed = true;
+
+  const titleEl = document.querySelector('#schueler-anlegen-view .home-title');
+  if (titleEl) titleEl.textContent = 'Schüler anlegen';
+
+  DOM.schuelerAnlegenView.classList.remove('active');
+  const student = state.students[idx];
+  DOM.studentDashboardName.textContent = `Förderpläne: ${student.name}`;
+  renderStudentDashboardTiles(student);
+  DOM.studentDashboardView.classList.add('active');
+  renderStudents();
+  showToast('Stammdaten wurden aktualisiert.');
+}
+
 function renderStammdatenInTile(student, bodyEl) {
   if (!bodyEl) return;
   const sd = student.stammdaten;
@@ -1396,6 +1548,7 @@ function navigateToSchuelerAnlegen() {
 }
 
 function saveNeuerSchueler() {
+  if (state.stammdatenEditMode) { saveStammdatenEdit(); return; }
   const name = document.getElementById('anlegen-name').value.trim();
   if (!name) { showToast('Bitte einen Namen eingeben.', 'error'); return; }
 
@@ -1666,10 +1819,11 @@ function openStudentDashboard(studentId) {
   if (!student) return;
 
   state.selectedStudentId = studentId;
+  if (state.mode === 'erstellen') state.stammdatenConfirmed = student.stammdatenConfirmed === true;
   DOM.studentDashboardName.textContent = `Förderpläne: ${student.name}`;
   renderStudentDashboardTiles(student);
 
-  DOM.btnNewFoerderplan.style.display = state.mode === 'einsehen' ? 'none' : '';
+  DOM.btnNewFoerderplan.style.display = (state.mode === 'einsehen' || state.mode === 'erstellen') ? 'none' : '';
 
   DOM.dashboardGrid.classList.add('hidden');
   DOM.studentDashboardView.classList.add('active');
@@ -1692,7 +1846,19 @@ function getSchoolYear(dateStr) {
 }
 
 function renderStudentDashboardTiles(student) {
-  renderStammdatenInTile(student, document.querySelector('#tile-stammdaten .subject-tile-body'));
+  const stammdatenBody = document.querySelector('#tile-stammdaten .subject-tile-body');
+  const stammdatenEditBtn = document.getElementById('btn-stammdaten-edit');
+  if (state.mode === 'erstellen' && !state.stammdatenConfirmed) {
+    stammdatenBody.innerHTML = `<p class="tile-warn-prompt">Stammdaten müssen aktualisiert werden.<br><small>Klicken zum Bearbeiten</small></p>`;
+    if (stammdatenEditBtn) stammdatenEditBtn.style.display = 'none';
+  } else {
+    renderStammdatenInTile(student, stammdatenBody);
+    if (stammdatenEditBtn) stammdatenEditBtn.style.display = state.mode === 'erstellen' ? 'flex' : 'none';
+  }
+
+  // Hide "Alte Förderpläne" tile in erstellen mode
+  const historyTile = document.getElementById('tile-alte-foerderplaene');
+  if (historyTile) historyTile.style.display = state.mode === 'erstellen' ? 'none' : '';
 
   // Render "Alte Förderpläne" tile
   const historyBody = document.querySelector('#tile-alte-foerderplaene .subject-tile-body');
@@ -1766,7 +1932,8 @@ function renderStudentDashboardTiles(student) {
   });
 
   ['allgemein', 'mathe', 'englisch', 'deutsch'].forEach(subject => {
-    const tileBody = document.querySelector(`#tile-${subject} .subject-tile-body`);
+    const tile = document.getElementById(`tile-${subject}`);
+    const tileBody = tile.querySelector('.subject-tile-body');
     const plansObj = student.plans[subject] || {};
 
     const activeGoals = Object.keys(plansObj).filter(g => {
@@ -1774,20 +1941,32 @@ function renderStudentDashboardTiles(student) {
       return val && (typeof val === 'object' ? val.level > 0 : val > 0);
     });
 
-    if (activeGoals.length === 0) {
-      tileBody.innerHTML = `<p class="tile-empty-state">Noch keine Förderziele vorhanden.</p>`;
-      return;
+    if (state.mode === 'erstellen') {
+      if (!state.stammdatenConfirmed) {
+        tile.classList.add('tile--locked');
+        tileBody.innerHTML = `<p class="tile-warn-prompt">Bitte zuerst Stammdaten aktualisieren.</p>`;
+        return;
+      }
+      tile.classList.remove('tile--locked');
+      if (activeGoals.length === 0) {
+        tileBody.innerHTML = `<p class="tile-create-prompt">Noch kein Förderplan vorhanden.<br>Klicken zum Anlegen.</p>`;
+        return;
+      }
+    } else {
+      tile.classList.remove('tile--locked');
+      if (activeGoals.length === 0) {
+        tileBody.innerHTML = `<p class="tile-empty-state">Noch keine Förderziele vorhanden.</p>`;
+        return;
+      }
     }
 
     tileBody.innerHTML = activeGoals.map(goalName => {
       const val = plansObj[goalName];
       const level = typeof val === 'object' ? val.level : val;
       const measures = (val && typeof val === 'object' && Array.isArray(val.measures)) ? val.measures : [];
-
       const measuresHTML = measures.length > 0
         ? `<ul class="tile-measures-list">${measures.map(m => `<li>${escapeHTML(m)}</li>`).join('')}</ul>`
         : '';
-
       return `
         <div class="tile-goal-item">
           <div class="tile-goal-name">
@@ -1826,8 +2005,16 @@ function setupEventListeners() {
   DOM.verwaltungTileSchueler.addEventListener('click', navigateToSchuelerVerwaltung);
   DOM.schuelerTileAnlegen.addEventListener('click', navigateToSchuelerAnlegen);
   DOM.btnBackFromSchuelerAnlegen.addEventListener('click', () => {
-    DOM.schuelerAnlegenView.classList.remove('active');
-    DOM.schuelerVerwaltungView.classList.add('active');
+    if (state.stammdatenEditMode) {
+      state.stammdatenEditMode = false;
+      const titleEl = document.querySelector('#schueler-anlegen-view .home-title');
+      if (titleEl) titleEl.textContent = 'Schüler anlegen';
+      DOM.schuelerAnlegenView.classList.remove('active');
+      DOM.studentDashboardView.classList.add('active');
+    } else {
+      DOM.schuelerAnlegenView.classList.remove('active');
+      DOM.schuelerVerwaltungView.classList.add('active');
+    }
   });
   DOM.btnSaveNeuerSchueler.addEventListener('click', saveNeuerSchueler);
   DOM.schuelerTileVerwalten.addEventListener('click', navigateToSchuelerVerwalten);
@@ -1931,10 +2118,33 @@ function setupEventListeners() {
   });
 
   // Subject tile clicks → Detail View
+  document.getElementById('tile-stammdaten').addEventListener('click', () => {
+    if (state.mode === 'erstellen' && !state.stammdatenConfirmed) openStammdatenEdit();
+  });
+
+  document.getElementById('btn-stammdaten-edit').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openStammdatenEdit();
+  });
+
   document.querySelectorAll('.subject-tiles-grid .subject-tile').forEach(tile => {
     tile.addEventListener('click', () => {
       const subject = tile.id.replace('tile-', '');
-      openSubjectDetailView(subject);
+      if (state.mode === 'erstellen') {
+        if (!state.stammdatenConfirmed) {
+          Swal.fire({
+            title: 'Stammdaten aktualisieren',
+            text: 'Die Stammdaten müssen aktualisiert werden, bevor ein neuer Förderplan angelegt werden kann.',
+            icon: 'warning',
+            showConfirmButton: false,
+            showCloseButton: true,
+          });
+          return;
+        }
+        openWorkspace(subject);
+      } else {
+        openSubjectDetailView(subject);
+      }
     });
   });
 

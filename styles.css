@@ -1301,6 +1301,28 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   font-size: 0.95rem;
   color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-stammdaten-edit {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: #fbbf24;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  padding: 0;
+}
+.btn-stammdaten-edit:hover {
+  background: #f59e0b;
 }
 
 .subject-tile-header[data-subject="stammdaten"]        { background-color: #334155; }
@@ -1891,6 +1913,39 @@ h1, h2, h3, h4, h5, h6 {
 .btn-verwaltung-archive:hover {
   background-color: #ffedd5;
   border-color: #fdba74;
+}
+
+.tile--locked {
+  opacity: 0.4;
+  cursor: not-allowed !important;
+}
+
+.tile-create-prompt {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 24px 12px;
+  line-height: 1.6;
+}
+
+.tile-warn-prompt {
+  color: #b91c1c;
+  font-size: 0.82rem;
+  text-align: center;
+  padding: 24px 12px;
+  line-height: 1.5;
+}
+
+.tile-warn-prompt small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+#tile-stammdaten {
+  cursor: default;
+  transition: box-shadow var(--transition-fast);
 }
 
 .home-tile--disabled {
