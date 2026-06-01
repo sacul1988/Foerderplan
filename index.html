@@ -49,6 +49,14 @@
         </button>
       </div>
 
+      <!-- Fristen-Kachel -->
+      <div class="home-fristen-tile" id="home-fristen-tile">
+        <div class="home-fristen-header">
+          <h3 class="home-fristen-title">Fristen &amp; Zeiträume</h3>
+        </div>
+        <div class="home-fristen-body" id="home-fristen-body"></div>
+      </div>
+
       <!-- Übersicht-Panel -->
       <div class="home-uebersicht-panel" id="home-uebersicht-panel">
         <div class="home-uebersicht-header">
@@ -112,21 +120,52 @@
         <h2 class="home-title">Zeiträume festlegen</h2>
       </div>
       <div class="zeitraum-container">
-        <div class="glass-card zeitraum-card">
-          <p class="zeitraum-description">Lege fest, in welchem Zeitraum Förderpläne angelegt werden können. Außerhalb dieses Zeitraums ist die Kachel <strong>Förderpläne erstellen</strong> gesperrt.</p>
+
+        <div class="glass-card zeitraum-section-card">
+          <div class="zeitraum-section-title">Schuljahr</div>
           <div class="zeitraum-inputs">
             <div class="form-group">
-              <label class="form-label" for="zeitraum-von">Von</label>
-              <input type="date" class="form-input zeitraum-date-input" id="zeitraum-von">
+              <label class="form-label" for="schuljahr-von">Von</label>
+              <input type="date" class="form-input zeitraum-date-input" id="schuljahr-von">
             </div>
             <div class="form-group">
-              <label class="form-label" for="zeitraum-bis">Bis</label>
-              <input type="date" class="form-input zeitraum-date-input" id="zeitraum-bis">
+              <label class="form-label" for="schuljahr-bis">Bis</label>
+              <input type="date" class="form-input zeitraum-date-input" id="schuljahr-bis">
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card zeitraum-section-card">
+          <div class="zeitraum-section-title">Förderpläne schreiben</div>
+          <p class="zeitraum-description">Außerhalb dieses Zeitraums ist die Kachel <strong>Förderpläne erstellen</strong> gesperrt.</p>
+          <div class="zeitraum-inputs">
+            <div class="form-group">
+              <label class="form-label" for="foerderplan-von">Von</label>
+              <input type="date" class="form-input zeitraum-date-input" id="foerderplan-von">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="foerderplan-bis">Bis</label>
+              <input type="date" class="form-input zeitraum-date-input" id="foerderplan-bis">
             </div>
           </div>
           <div id="zeitraum-status" class="zeitraum-status"></div>
-          <button type="button" class="btn-save-fab" id="btn-save-zeitraum" title="Speichern">&#10003;</button>
         </div>
+
+        <div class="glass-card zeitraum-section-card">
+          <div class="zeitraum-section-title">Förderplangespräche</div>
+          <div class="zeitraum-inputs">
+            <div class="form-group">
+              <label class="form-label" for="elterngespraeche-von">Von</label>
+              <input type="date" class="form-input zeitraum-date-input" id="elterngespraeche-von">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="elterngespraeche-bis">Bis</label>
+              <input type="date" class="form-input zeitraum-date-input" id="elterngespraeche-bis">
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="btn-save-fab" id="btn-save-zeitraum" title="Speichern">&#10003;</button>
       </div>
     </div>
 

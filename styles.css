@@ -1691,11 +1691,19 @@ h1, h2, h3, h4, h5, h6 {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
 
-.zeitraum-card {
-  gap: 20px;
-  flex-grow: 1;
+.zeitraum-section-card {
+  gap: 14px;
+}
+
+.zeitraum-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
 }
 
 .zeitraum-description {
@@ -1891,6 +1899,101 @@ h1, h2, h3, h4, h5, h6 {
 
 .verwaltung-tiles-grid {
   grid-template-columns: repeat(3, 1fr);
+}
+
+/* --- Home Fristen-Kachel --- */
+.home-fristen-tile {
+  width: 100%;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow var(--transition-fast);
+}
+
+.home-fristen-tile:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.home-fristen-header {
+  background-color: #1e40af;
+  padding: 16px 22px;
+}
+
+.home-fristen-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: white;
+}
+
+.home-fristen-body {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  divide: '';
+}
+
+@media (max-width: 700px) {
+  .home-fristen-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fristen-col {
+  padding: 16px 20px;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fristen-col:last-child {
+  border-right: none;
+}
+
+.fristen-col-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.fristen-col-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.fristen-col-value--empty {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-style: italic;
+}
+
+.fristen-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 99px;
+  margin-top: 2px;
+  align-self: flex-start;
+}
+
+.fristen-badge--aktiv {
+  background-color: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.fristen-badge--inaktiv {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
 /* --- Home Übersicht-Panel --- */
