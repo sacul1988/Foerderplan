@@ -1652,13 +1652,13 @@ function navigateToApp() {
 }
 
 function navigateToVerwaltung() {
+  setHeader('Förderplan · Verwaltung');
   state.mode = 'verwaltung';
   DOM.homeView.classList.remove('active');
   DOM.verwaltungView.classList.add('active');
 }
 
 function navigateToSchuelerVerwalten() {
-  setHeader('Förderplan · Verwaltung');
   DOM.verwaltungView.classList.remove('active');
   DOM.dashboardGrid.classList.add('einsehen-mode');
   DOM.dashboardGrid.classList.remove('hidden');
