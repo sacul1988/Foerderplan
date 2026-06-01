@@ -1641,7 +1641,7 @@ function setupEventListeners() {
   DOM.btnBackFromList.addEventListener('click', () => {
     DOM.studentSearch.value = '';
     filterStudents('');
-    if (state.mode === 'einsehen') {
+    if (state.mode === 'einsehen' || state.mode === 'erstellen') {
       showHomeView();
     } else {
       DOM.dashboardGrid.classList.add('hidden');
@@ -1666,9 +1666,7 @@ function setupEventListeners() {
   document.getElementById('home-uebersicht-list').addEventListener('click', (e) => {
     const entry = e.target.closest('[data-student-id]');
     if (!entry) return;
-    state.mode = 'default';
-    DOM.homeView.classList.remove('active');
-    DOM.dashboardGrid.classList.remove('einsehen-mode');
+    navigateToApp();
     openStudentDashboard(entry.dataset.studentId);
   });
 
@@ -1957,9 +1955,10 @@ function showHomeView() {
 }
 
 function navigateToApp() {
-  state.mode = 'default';
+  setHeader('Förderplan · Erstellen');
+  state.mode = 'erstellen';
   DOM.homeView.classList.remove('active');
-  DOM.dashboardGrid.classList.remove('einsehen-mode');
+  DOM.dashboardGrid.classList.add('einsehen-mode');
   DOM.dashboardGrid.classList.remove('hidden');
 }
 
