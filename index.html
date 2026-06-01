@@ -89,6 +89,24 @@
           <div class="home-tile-title">Übersicht / Status</div>
           <div class="home-tile-desc">Gesamtübersicht aller Schüler und Förderpläne</div>
         </button>
+        <button class="home-tile" id="verwaltung-tile-archiv" type="button">
+          <div class="home-tile-icon home-tile-icon--archiv">A</div>
+          <div class="home-tile-title">Archiv</div>
+          <div class="home-tile-desc">Archivierte Schüler verwalten und löschen</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= ARCHIV VIEW ================= -->
+    <div class="home-view" id="archiv-view">
+      <div class="subview-header">
+        <button type="button" class="btn-back-circle" id="btn-back-from-archiv">&#8592;</button>
+        <h2 class="home-title">Archiv</h2>
+      </div>
+      <div class="archiv-container">
+        <div class="glass-card archiv-card">
+          <div id="archiv-list"></div>
+        </div>
       </div>
     </div>
 
@@ -99,17 +117,100 @@
         <h2 class="home-title">Schüler verwalten</h2>
       </div>
       <div class="home-tiles-grid schueler-tiles-grid">
-        <button class="home-tile home-tile--disabled" type="button" disabled>
-          <div class="home-tile-icon home-tile-icon--disabled">+</div>
+        <button class="home-tile" id="schueler-tile-anlegen" type="button">
+          <div class="home-tile-icon home-tile-icon--verwaltung">+</div>
           <div class="home-tile-title">Schüler neu anlegen</div>
-          <div class="home-tile-desc">Neuen Schüler zur Liste hinzufügen</div>
-          <span class="coming-soon-badge">Kommt bald</span>
+          <div class="home-tile-desc">Neuen Schüler mit Stammdaten anlegen</div>
         </button>
         <button class="home-tile" id="schueler-tile-verwalten" type="button">
           <div class="home-tile-icon home-tile-icon--verwaltung">S</div>
           <div class="home-tile-title">Schüler verwalten</div>
           <div class="home-tile-desc">Schülerliste einsehen und bearbeiten</div>
         </button>
+      </div>
+    </div>
+
+    <!-- ================= SCHÜLER ANLEGEN VIEW ================= -->
+    <div class="home-view" id="schueler-anlegen-view">
+      <div class="subview-header">
+        <button type="button" class="btn-back-circle" id="btn-back-from-schueler-anlegen">&#8592;</button>
+        <h2 class="home-title">Schüler anlegen</h2>
+      </div>
+      <div class="glass-card schueler-anlegen-card">
+
+        <div class="form-group">
+          <label class="form-label" for="anlegen-name">Name des Schülers</label>
+          <input type="text" class="form-input" id="anlegen-name" placeholder="Vor- und Nachname" autocomplete="off">
+        </div>
+
+        <div class="stammdaten-form-grid">
+
+          <div class="stammdaten-form-row">
+            <div class="stammdaten-form-cell">
+              <span class="stammdaten-form-label">Förderbedarfe:</span>
+            </div>
+            <div class="stammdaten-form-cell">
+              <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="anlegen-foerderbedarf" value="zielgleich"> Zielgleich</label>
+                <label class="radio-label"><input type="radio" name="anlegen-foerderbedarf" value="zieldifferent"> Zieldifferent</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="stammdaten-form-row">
+            <div class="stammdaten-form-cell">
+              <span class="stammdaten-form-label">Nachteilsausgleich vorhanden:</span>
+              <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="anlegen-nachteilsausgleich" value="ja"> ja</label>
+                <label class="radio-label"><input type="radio" name="anlegen-nachteilsausgleich" value="nein"> nein</label>
+              </div>
+            </div>
+            <div class="stammdaten-form-cell">
+              <span class="stammdaten-form-label">Beschulungsjahr:</span>
+              <input type="text" class="form-input" id="anlegen-beschulungsjahr" placeholder="z. B. 5" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="stammdaten-form-row">
+            <div class="stammdaten-form-cell">
+              <span class="stammdaten-form-label">Wichtig:</span>
+              <input type="text" class="form-input" id="anlegen-wichtig" autocomplete="off">
+            </div>
+            <div class="stammdaten-form-cell">
+              <span class="stammdaten-form-label">Thematische Teilnahme am Regelunterricht:</span>
+              <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="anlegen-thematische-teilnahme" value="ja"> ja</label>
+                <label class="radio-label"><input type="radio" name="anlegen-thematische-teilnahme" value="nein"> nein</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="stammdaten-form-row">
+            <div class="stammdaten-form-cell">
+              <span class="stammdaten-form-label">Zuständigkeit:</span>
+              <input type="text" class="form-input" id="anlegen-zustaendigkeit" autocomplete="off">
+            </div>
+            <div class="stammdaten-form-cell">
+              <span class="stammdaten-form-label">Noten:</span>
+              <div class="radio-group radio-group--wrap">
+                <label class="radio-label"><input type="radio" name="anlegen-noten" value="ja"> ja</label>
+                <label class="radio-label"><input type="radio" name="anlegen-noten" value="nein"> nein</label>
+                <label class="radio-label"><input type="radio" name="anlegen-noten" value="ind-paed"> ind.-päd.</label>
+                <label class="radio-label"><input type="radio" name="anlegen-noten" value="esa"> ESA angestrebt (ab Kl 8)</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="stammdaten-form-row stammdaten-form-row--full">
+            <div class="stammdaten-form-cell">
+              <span class="stammdaten-form-label">Bemerkungen:</span>
+              <textarea class="form-input" id="anlegen-bemerkungen" rows="3" placeholder="Weitere Hinweise..."></textarea>
+            </div>
+          </div>
+
+        </div>
+
+        <button type="button" class="btn-save-fab" id="btn-save-neuer-schueler" title="Schüler anlegen">&#10003;</button>
       </div>
     </div>
 
@@ -285,29 +386,23 @@
       </div>
 
       <!-- Stammdaten -->
-      <div class="subject-tile stammdaten-tile">
+      <div class="subject-tile stammdaten-tile" id="tile-stammdaten-verwaltung">
         <div class="subject-tile-header" data-subject="stammdaten">Stammdaten</div>
-        <div class="subject-tile-body">
+        <div class="subject-tile-body" id="tile-stammdaten-verwaltung-body">
           <p class="tile-empty-state">Stammdaten werden hier ergänzt.</p>
         </div>
       </div>
 
-      <!-- Verwaltungs-Kacheln -->
-      <div class="subject-tiles-grid">
-        <div class="subject-tile home-tile--disabled" style="pointer-events:none; opacity:0.5;">
-          <div class="subject-tile-header" data-subject="alte-foerderplaene">Schüler bearbeiten</div>
-          <div class="subject-tile-body">
-            <p class="tile-empty-state">Schülerdaten anpassen</p>
-            <span class="coming-soon-badge" style="display:block; text-align:center; margin-top:8px;">Kommt bald</span>
-          </div>
-        </div>
-        <div class="subject-tile home-tile--disabled" style="pointer-events:none; opacity:0.5;">
-          <div class="subject-tile-header" data-subject="alte-foerderplaene">Schüler archivieren</div>
-          <div class="subject-tile-body">
-            <p class="tile-empty-state">Schüler aus der aktiven Liste entfernen</p>
-            <span class="coming-soon-badge" style="display:block; text-align:center; margin-top:8px;">Kommt bald</span>
-          </div>
-        </div>
+      <!-- Verwaltungs-Aktionen -->
+      <div class="verwaltung-action-row">
+        <button type="button" class="btn-verwaltung-action btn-verwaltung-edit" id="btn-schueler-bearbeiten">
+          <span class="verwaltung-action-icon">&#9998;</span>
+          Schüler bearbeiten
+        </button>
+        <button type="button" class="btn-verwaltung-action btn-verwaltung-archive" id="btn-schueler-archivieren">
+          <span class="verwaltung-action-icon">&#8856;</span>
+          Schüler archivieren
+        </button>
       </div>
     </section>
 

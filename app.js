@@ -392,12 +392,19 @@ const DOM = {
   verwaltungTileSchueler: document.getElementById('verwaltung-tile-schueler'),
   verwaltungTileZeitraum: document.getElementById('verwaltung-tile-zeitraum'),
   verwaltungTileUebersicht: document.getElementById('verwaltung-tile-uebersicht'),
+  verwaltungTileArchiv: document.getElementById('verwaltung-tile-archiv'),
   btnBackFromVerwaltung: document.getElementById('btn-back-from-verwaltung'),
   uebersichtView: document.getElementById('uebersicht-view'),
   btnBackFromUebersicht: document.getElementById('btn-back-from-uebersicht'),
+  archivView: document.getElementById('archiv-view'),
+  btnBackFromArchiv: document.getElementById('btn-back-from-archiv'),
   schuelerVerwaltungView: document.getElementById('schueler-verwaltung-view'),
+  schuelerTileAnlegen: document.getElementById('schueler-tile-anlegen'),
   schuelerTileVerwalten: document.getElementById('schueler-tile-verwalten'),
   btnBackFromSchuelerVerwaltung: document.getElementById('btn-back-from-schueler-verwaltung'),
+  schuelerAnlegenView: document.getElementById('schueler-anlegen-view'),
+  btnBackFromSchuelerAnlegen: document.getElementById('btn-back-from-schueler-anlegen'),
+  btnSaveNeuerSchueler: document.getElementById('btn-save-neuer-schueler'),
   schuelerDetailVerwaltungView: document.getElementById('schueler-detail-verwaltung-view'),
   schuelerDetailVerwaltungTitle: document.getElementById('schueler-detail-verwaltung-title'),
   btnBackFromSchuelerDetail: document.getElementById('btn-back-from-schueler-detail'),
@@ -542,14 +549,14 @@ function renderStudents() {
   const cards = DOM.studentList.querySelectorAll('.student-card');
   cards.forEach(card => card.remove());
   
-  if (state.students.length === 0) {
+  if (state.students.filter(s => !s.archived).length === 0) {
     DOM.emptyState.style.display = 'flex';
     return;
   }
   
   DOM.emptyState.style.display = 'none';
-  
-  state.students.forEach(student => {
+
+  state.students.filter(s => !s.archived).forEach(student => {
     const studentCard = document.createElement('div');
     studentCard.className = 'student-card';
     studentCard.dataset.id = student.id;
@@ -600,6 +607,7 @@ function addStudent(name) {
   const newStudent = {
     id: Date.now().toString(),
     name: trimmedName,
+    archived: false,
     plans: {
       allgemein: {},
       mathe: {},
@@ -1351,6 +1359,77 @@ function renderSubjectDetailContent(student, subject) {
   }).join('');
 }
 
+// --- Stammdaten ---
+function renderStammdatenInTile(student, bodyEl) {
+  if (!bodyEl) return;
+  const sd = student.stammdaten;
+  if (!sd || Object.values(sd).every(v => !v || v === '')) {
+    bodyEl.innerHTML = `<p class="tile-empty-state">Stammdaten werden hier ergänzt.</p>`;
+    return;
+  }
+  const notenLabels = { ja: 'Ja', nein: 'Nein', 'ind-paed': 'Ind.-päd.', esa: 'ESA angestrebt (ab Kl 8)' };
+  const rows = [
+    sd.foerderbedarf       ? ['Förderbedarf',             sd.foerderbedarf === 'zielgleich' ? 'Zielgleich' : 'Zieldifferent'] : null,
+    sd.nachteilsausgleich  ? ['Nachteilsausgleich',        sd.nachteilsausgleich === 'ja' ? 'Ja' : 'Nein'] : null,
+    sd.beschulungsjahr     ? ['Beschulungsjahr',           sd.beschulungsjahr] : null,
+    sd.wichtig             ? ['Wichtig',                   sd.wichtig] : null,
+    sd.thematischeTeilnahme? ['Thematische Teilnahme',     sd.thematischeTeilnahme === 'ja' ? 'Ja' : 'Nein'] : null,
+    sd.zustaendigkeit      ? ['Zuständigkeit',             sd.zustaendigkeit] : null,
+    sd.noten               ? ['Noten',                     notenLabels[sd.noten] || sd.noten] : null,
+    sd.bemerkungen         ? ['Bemerkungen',               sd.bemerkungen] : null,
+  ].filter(Boolean);
+  bodyEl.innerHTML = `<div class="stammdaten-display">${rows.map(([k, v]) =>
+    `<div class="stammdaten-row"><span class="stammdaten-key">${k}:</span><span class="stammdaten-val">${escapeHTML(v)}</span></div>`
+  ).join('')}</div>`;
+}
+
+function navigateToSchuelerAnlegen() {
+  document.getElementById('anlegen-name').value = '';
+  document.querySelectorAll('#schueler-anlegen-view input[type="radio"]').forEach(r => r.checked = false);
+  ['anlegen-beschulungsjahr','anlegen-wichtig','anlegen-zustaendigkeit','anlegen-bemerkungen'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  DOM.schuelerVerwaltungView.classList.remove('active');
+  DOM.schuelerAnlegenView.classList.add('active');
+}
+
+function saveNeuerSchueler() {
+  const name = document.getElementById('anlegen-name').value.trim();
+  if (!name) { showToast('Bitte einen Namen eingeben.', 'error'); return; }
+
+  const radio = n => document.querySelector(`input[name="${n}"]:checked`)?.value || null;
+  const val   = id => document.getElementById(id)?.value.trim() || '';
+
+  const newStudent = {
+    id: Date.now().toString(),
+    name,
+    archived: false,
+    stammdaten: {
+      foerderbedarf:        radio('anlegen-foerderbedarf'),
+      nachteilsausgleich:   radio('anlegen-nachteilsausgleich'),
+      beschulungsjahr:      val('anlegen-beschulungsjahr'),
+      wichtig:              val('anlegen-wichtig'),
+      thematischeTeilnahme: radio('anlegen-thematische-teilnahme'),
+      zustaendigkeit:       val('anlegen-zustaendigkeit'),
+      noten:                radio('anlegen-noten'),
+      bemerkungen:          val('anlegen-bemerkungen'),
+    },
+    plans: { allgemein: {}, mathe: {}, englisch: {}, deutsch: {} },
+    history: []
+  };
+
+  state.students.push(newStudent);
+  storage.saveData(state.students);
+  renderStudents();
+  renderHomeUebersicht();
+  showToast(`Schüler/in "${name}" wurde angelegt.`);
+
+  DOM.schuelerAnlegenView.classList.remove('active');
+  DOM.dashboardGrid.classList.add('einsehen-mode');
+  DOM.dashboardGrid.classList.remove('hidden');
+}
+
 // --- Shared Helper ---
 function hasPlan(student, subject) {
   const plans = student.plans[subject] || {};
@@ -1370,10 +1449,11 @@ function renderHomeUebersicht() {
   const subjectLabels = { allgemein: 'Allgemein', mathe: 'Mathe', englisch: 'Englisch', deutsch: 'Deutsch' };
 
   const incompleteStudents = state.students.filter(s =>
-    !subjects.every(sub => hasPlan(s, sub))
+    !s.archived && !subjects.every(sub => hasPlan(s, sub))
   );
 
-  if (state.students.length === 0) {
+  const activeStudents = state.students.filter(s => !s.archived);
+  if (activeStudents.length === 0) {
     countEl.textContent = '';
     list.innerHTML = `<p class="home-uebersicht-no-students">Noch keine Schüler angelegt.</p>`;
     return;
@@ -1433,17 +1513,18 @@ function renderUebersicht() {
 
   const wrap = document.getElementById('uebersicht-table-wrap');
 
-  if (state.students.length === 0) {
+  const activeStudents = state.students.filter(s => !s.archived);
+
+  if (activeStudents.length === 0) {
     wrap.innerHTML = `<div class="empty-state"><p class="empty-state-text">Keine Schüler vorhanden.</p></div>`;
     return;
   }
-
 
   const headerCells = subjects.map(s =>
     `<div class="uebersicht-subject-label" data-subject="${s}">${subjectLabels[s]}</div>`
   ).join('');
 
-  const rows = state.students.map(student => {
+  const rows = activeStudents.map(student => {
     const initials = student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     const cells = subjects.map(subject => {
       const done = hasPlan(student, subject);
@@ -1464,7 +1545,7 @@ function renderUebersicht() {
       </div>`;
   }).join('');
 
-  const completeCount = state.students.filter(s => subjects.every(sub => hasPlan(s, sub))).length;
+  const completeCount = activeStudents.filter(s => subjects.every(sub => hasPlan(s, sub))).length;
 
   wrap.innerHTML = `
     <div class="uebersicht-header-row">
@@ -1477,12 +1558,97 @@ function renderUebersicht() {
     </div>`;
 }
 
+// --- Archiv ---
+function archiveStudent(studentId) {
+  const student = state.students.find(s => s.id === studentId);
+  if (!student) return;
+  student.archived = true;
+  storage.saveData(state.students);
+  renderStudents();
+  renderHomeUebersicht();
+  showToast(`"${student.name}" wurde archiviert.`);
+}
+
+function navigateToArchiv() {
+  renderArchiv();
+  DOM.verwaltungView.classList.remove('active');
+  DOM.archivView.classList.add('active');
+}
+
+function renderArchiv() {
+  const list = document.getElementById('archiv-list');
+  const archived = state.students.filter(s => s.archived);
+
+  if (archived.length === 0) {
+    list.innerHTML = `<div class="empty-state"><p class="empty-state-text">Keine archivierten Schüler.</p></div>`;
+    return;
+  }
+
+  list.innerHTML = archived.map(student => {
+    const initials = student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    return `
+      <div class="archiv-entry">
+        <div class="student-info">
+          <div class="student-avatar">${escapeHTML(initials)}</div>
+          <div class="student-name">${escapeHTML(student.name)}</div>
+        </div>
+        <div class="archiv-entry-actions">
+          <button type="button" class="btn-restore" data-student-id="${escapeHTML(student.id)}">
+            Wiederherstellen
+          </button>
+          <button type="button" class="btn-delete-permanent" data-student-id="${escapeHTML(student.id)}">
+            Endgültig löschen
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('.btn-restore').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const student = state.students.find(s => s.id === btn.dataset.studentId);
+      if (!student) return;
+      student.archived = false;
+      storage.saveData(state.students);
+      renderStudents();
+      renderHomeUebersicht();
+      renderArchiv();
+      showToast(`"${student.name}" wurde wiederhergestellt.`);
+    });
+  });
+
+  list.querySelectorAll('.btn-delete-permanent').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const name = state.students.find(s => s.id === btn.dataset.studentId)?.name || '';
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          title: 'Endgültig löschen?',
+          text: `"${name}" wird unwiderruflich gelöscht.`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#dc2626',
+          cancelButtonText: 'Abbrechen',
+          confirmButtonText: 'Löschen'
+        }).then(result => {
+          if (result.isConfirmed) {
+            deleteStudent(btn.dataset.studentId);
+            renderArchiv();
+          }
+        });
+      } else {
+        deleteStudent(btn.dataset.studentId);
+        renderArchiv();
+      }
+    });
+  });
+}
+
 // --- Schüler Verwaltungs-Dashboard ---
 function openSchuelerDetailVerwaltung(studentId) {
   const student = state.students.find(s => s.id === studentId);
   if (!student) return;
   state.selectedStudentId = studentId;
   DOM.schuelerDetailVerwaltungTitle.textContent = student.name;
+  renderStammdatenInTile(student, document.getElementById('tile-stammdaten-verwaltung-body'));
   DOM.dashboardGrid.classList.add('hidden');
   DOM.schuelerDetailVerwaltungView.classList.add('active');
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1525,6 +1691,8 @@ function getSchoolYear(dateStr) {
 }
 
 function renderStudentDashboardTiles(student) {
+  renderStammdatenInTile(student, document.querySelector('#tile-stammdaten .subject-tile-body'));
+
   // Render "Alte Förderpläne" tile
   const historyBody = document.querySelector('#tile-alte-foerderplaene .subject-tile-body');
   const history = student.history || [];
@@ -1655,6 +1823,12 @@ function setupEventListeners() {
 
   // Verwaltung sub-tiles
   DOM.verwaltungTileSchueler.addEventListener('click', navigateToSchuelerVerwaltung);
+  DOM.schuelerTileAnlegen.addEventListener('click', navigateToSchuelerAnlegen);
+  DOM.btnBackFromSchuelerAnlegen.addEventListener('click', () => {
+    DOM.schuelerAnlegenView.classList.remove('active');
+    DOM.schuelerVerwaltungView.classList.add('active');
+  });
+  DOM.btnSaveNeuerSchueler.addEventListener('click', saveNeuerSchueler);
   DOM.schuelerTileVerwalten.addEventListener('click', navigateToSchuelerVerwalten);
   DOM.btnBackFromSchuelerVerwaltung.addEventListener('click', () => {
     DOM.schuelerVerwaltungView.classList.remove('active');
@@ -1679,6 +1853,36 @@ function setupEventListeners() {
   DOM.btnBackFromUebersicht.addEventListener('click', () => {
     DOM.uebersichtView.classList.remove('active');
     DOM.verwaltungView.classList.add('active');
+  });
+  DOM.verwaltungTileArchiv.addEventListener('click', navigateToArchiv);
+  DOM.btnBackFromArchiv.addEventListener('click', () => {
+    DOM.archivView.classList.remove('active');
+    DOM.verwaltungView.classList.add('active');
+  });
+  document.getElementById('btn-schueler-archivieren').addEventListener('click', () => {
+    const student = state.students.find(s => s.id === state.selectedStudentId);
+    if (!student) return;
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        title: 'Schüler archivieren?',
+        text: `"${student.name}" wird in das Archiv verschoben.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ea580c',
+        cancelButtonText: 'Abbrechen',
+        confirmButtonText: 'Archivieren'
+      }).then(result => {
+        if (result.isConfirmed) {
+          archiveStudent(state.selectedStudentId);
+          DOM.schuelerDetailVerwaltungView.classList.remove('active');
+          DOM.dashboardGrid.classList.remove('hidden');
+        }
+      });
+    } else {
+      archiveStudent(state.selectedStudentId);
+      DOM.schuelerDetailVerwaltungView.classList.remove('active');
+      DOM.dashboardGrid.classList.remove('hidden');
+    }
   });
   DOM.btnBackFromVerwaltung.addEventListener('click', showHomeView);
 
@@ -1941,16 +2145,12 @@ function renderFristenTile() {
     }
     const vonStr = period.von ? formatDate(period.von) : '–';
     const bisStr = period.bis ? formatDate(period.bis) : '–';
-    const badge = showBadge
-      ? (() => {
-          const aktiv = isZeitraumAktiv(zeitraum);
-          return `<span class="fristen-badge ${aktiv ? 'fristen-badge--aktiv' : 'fristen-badge--inaktiv'}">${aktiv ? 'Aktiv' : 'Inaktiv'}</span>`;
-        })()
+    const colorClass = showBadge
+      ? (isZeitraumAktiv(zeitraum) ? 'fristen-col--aktiv' : 'fristen-col--inaktiv')
       : '';
-    return `<div class="fristen-col">
+    return `<div class="fristen-col ${colorClass}">
       <span class="fristen-col-label">${label}</span>
       <span class="fristen-col-value">${vonStr} – ${bisStr}</span>
-      ${badge}
     </div>`;
   }
 
@@ -2000,6 +2200,8 @@ function showHomeView() {
   DOM.schuelerDetailVerwaltungView.classList.remove('active');
   DOM.zeitraumView.classList.remove('active');
   DOM.uebersichtView.classList.remove('active');
+  DOM.archivView.classList.remove('active');
+  DOM.schuelerAnlegenView.classList.remove('active');
   DOM.dashboardGrid.classList.add('hidden');
   DOM.dashboardGrid.classList.remove('einsehen-mode');
   DOM.studentDashboardView.classList.remove('active');
