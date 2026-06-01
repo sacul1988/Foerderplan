@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lern-Förderplan - Kernfunktion</title>
+  <meta name="description" content="Digitale Plattform zur Erstellung und Verwaltung von Lern-Förderplänen in Schulen.">
+  
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="logo-container">
+      <div class="logo-badge">FP</div>
+      <h1 class="logo-text">Förderplan-Assistent</h1>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+    
+    <!-- ================= VIEW 1: DASHBOARD ================= -->
+    <div class="dashboard-grid" id="dashboard-grid">
+      <!-- Left Column: Add Student Form -->
+      <section class="glass-card" aria-labelledby="add-student-title">
+        <h2 id="add-student-title" class="card-title">Schüler anlegen</h2>
+        
+        <form id="student-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="student-name">Name des Schülers</label>
+            <div class="input-container">
+              <input type="text" class="form-input" id="student-name" required placeholder="Name eingeben" autocomplete="off">
+            </div>
+          </div>
+          
+        </form>
+      </section>
+
+      <!-- Right Column: Student List -->
+      <section class="glass-card" aria-labelledby="student-list-title">
+        <h2 id="student-list-title" class="card-title">Schülerübersicht</h2>
+        
+        <div id="student-list" class="student-list-container">
+          <!-- Dynamically populated via JS -->
+          <div class="empty-state" id="empty-state">
+            <p class="empty-state-text">Keine Schüler vorhanden. Verwende das Formular, um einen Schüler anzulegen.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================= VIEW 1.5: STUDENT DASHBOARD ================= -->
+    <section id="student-dashboard-view" class="glass-card student-dashboard-view" aria-labelledby="student-dashboard-title">
+      <div class="student-dashboard-header">
+        <div class="student-dashboard-title-block">
+          <button type="button" id="btn-back-from-student-dashboard" class="btn-back-circle" title="Zur Übersicht" aria-label="Zur Übersicht">&#8592;</button>
+          <div>
+            <h2 id="student-dashboard-title" class="workspace-title">Förderpläne</h2>
+          </div>
+        </div>
+        <button type="button" id="btn-new-foerderplan" class="btn btn-primary">+ Neuen Förderplan</button>
+      </div>
+
+      <div class="subject-tiles-grid">
+        <div class="subject-tile" id="tile-allgemein">
+          <div class="subject-tile-header" data-subject="allgemein">Allgemeine Entwicklung</div>
+          <div class="subject-tile-body"></div>
+        </div>
+        <div class="subject-tile" id="tile-mathe">
+          <div class="subject-tile-header" data-subject="mathe">Mathematik</div>
+          <div class="subject-tile-body"></div>
+        </div>
+        <div class="subject-tile" id="tile-englisch">
+          <div class="subject-tile-header" data-subject="englisch">Englisch</div>
+          <div class="subject-tile-body"></div>
+        </div>
+        <div class="subject-tile" id="tile-deutsch">
+          <div class="subject-tile-header" data-subject="deutsch">Deutsch</div>
+          <div class="subject-tile-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= VIEW 2: FULL SCREEN WORKSPACE FOR GOALS ================= -->
+    <section id="goals-workspace-view" class="glass-card workspace-view" aria-labelledby="workspace-title">
+      <div class="workspace-header">
+        <div class="workspace-title-block">
+          <button type="button" id="btn-back-to-dashboard" class="btn-back-circle" title="Zurück zur Übersicht" aria-label="Zurück zur Übersicht">&#8592;</button>
+          <h2 id="workspace-title" class="workspace-title">Förderplan erstellen</h2>
+        </div>
+      </div>
+
+      <!-- Step Indicator Bar -->
+      <div class="step-indicator-bar">
+        <div class="step-node active" id="step-node-1">
+          <span class="step-number">1</span>
+          <span>Auswahl</span>
+        </div>
+        <div class="step-node" id="step-node-2">
+          <span class="step-number">2</span>
+          <span>Bewertung</span>
+        </div>
+        <div class="step-node" id="step-node-3">
+          <span class="step-number">3</span>
+          <span>Maßnahmen</span>
+        </div>
+      </div>
+
+      <!-- STEP 1 PANEL: Goal Selection -->
+      <div class="workspace-step-panel active" id="workspace-step-1">
+        <h3 class="step-section-title">Förderziele festlegen</h3>
+        <div id="workspace-goals-checklist-step1" class="goals-checklist-grid">
+          <!-- Dynamically populated checkbox list via JS -->
+        </div>
+
+        <!-- Custom Goal input -->
+        <div class="form-group" style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+          <label class="form-label" for="custom-goal-input">Eigenes Förderziel ergänzen</label>
+          <div style="display: flex; gap: 10px; max-width: 600px;">
+            <input type="text" id="custom-goal-input" class="form-input" placeholder="Zielsatz formulieren..." autocomplete="off">
+            <button type="button" id="btn-add-custom-goal" class="btn btn-secondary">Hinzufügen</button>
+          </div>
+        </div>
+
+        <!-- Footer buttons for Step 1 -->
+        <div class="workspace-footer">
+          <button type="button" id="btn-restart-selection" class="btn btn-secondary">Neustarten</button>
+          <button type="button" id="btn-cancel-workspace-step1" class="btn btn-secondary">Abbrechen</button>
+          <button type="button" id="btn-go-to-step2" class="btn btn-primary">Weiter zur Bewertung</button>
+        </div>
+      </div>
+
+      <!-- STEP 2 PANEL: Goal Rating -->
+      <div class="workspace-step-panel" id="workspace-step-2">
+        <p class="step-instruction"><strong>Schritt 2:</strong> Markiere die Förderziele farblich nach Wichtigkeit (Gelb = mittel, Rot = hoch).</p>
+        <div id="workspace-goals-checklist-step2" class="goals-checklist-grid">
+          <!-- Dynamically populated rating rows via JS -->
+        </div>
+
+        <!-- Legend -->
+        <div class="workspace-legend" role="note" aria-label="Legende Bewertungsskala">
+          <span style="font-weight: 600;">Legende:</span>
+          <div class="legend-item">
+            <span class="legend-dot" data-level="2"></span>
+            <span>Gelb = mittlerer Förderbedarf</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot" data-level="3"></span>
+            <span>Rot = hoher Förderbedarf</span>
+          </div>
+        </div>
+
+        <!-- Footer buttons for Step 2 -->
+        <div class="workspace-footer">
+          <button type="button" id="btn-back-to-step1" class="btn btn-secondary">Zurück zur Auswahl</button>
+          <button type="button" id="btn-go-to-step3" class="btn btn-primary">Weiter zu Maßnahmen</button>
+        </div>
+      </div>
+
+      <!-- STEP 3 PANEL: Support Measures -->
+      <div class="workspace-step-panel" id="workspace-step-3">
+        <p class="step-instruction"><strong>Schritt 3:</strong> Wähle die passenden Fördermaßnahmen für die ausgewählten Ziele aus.</p>
+        <div id="workspace-goals-checklist-step3" class="goals-checklist-grid">
+          <!-- Dynamically populated goals and measures checklist via JS -->
+        </div>
+
+        <!-- Footer buttons for Step 3 -->
+        <div class="workspace-footer">
+          <button type="button" id="btn-back-to-step2" class="btn btn-secondary">Zurück zur Bewertung</button>
+          <button type="button" id="btn-save-workspace" class="btn btn-primary">Speichern</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= MODAL: SUBJECT SELECTION ================= -->
+  <div class="modal-overlay" id="subject-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-title">Förderplan erstellen</h3>
+        <button id="btn-close-modal" class="close-btn" aria-label="Modal schließen" title="Modal schließen">&times;</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="subject-grid">
+          <button class="subject-btn" data-subject="allgemein" type="button">
+            <span>Allgemeine Entwicklung</span>
+          </button>
+          
+          <button class="subject-btn" data-subject="mathe" type="button">
+            <span>Mathematik</span>
+          </button>
+          
+          <button class="subject-btn" data-subject="englisch" type="button">
+            <span>Englisch</span>
+          </button>
+          
+          <button class="subject-btn" data-subject="deutsch" type="button">
+            <span>Deutsch</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+  <!-- JavaScript App Logic -->
+  <script src="./measures.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
