@@ -1620,8 +1620,15 @@ function setupEventListeners() {
   });
 }
 
+// --- Header ---
+function setHeader(text) {
+  const el = document.getElementById('logo-text');
+  if (el) el.textContent = text;
+}
+
 // --- Home Navigation ---
 function showHomeView() {
+  setHeader('Förderplan-Assistent');
   DOM.homeView.classList.add('active');
   DOM.verwaltungView.classList.remove('active');
   DOM.dashboardGrid.classList.add('hidden');
@@ -1651,12 +1658,14 @@ function navigateToVerwaltung() {
 }
 
 function navigateToSchuelerVerwalten() {
+  setHeader('Förderplan · Verwaltung');
   DOM.verwaltungView.classList.remove('active');
   DOM.dashboardGrid.classList.add('einsehen-mode');
   DOM.dashboardGrid.classList.remove('hidden');
 }
 
 function navigateToEinsehen() {
+  setHeader('Förderpläne · Einsehen');
   state.mode = 'einsehen';
   DOM.homeView.classList.remove('active');
   DOM.dashboardGrid.classList.add('einsehen-mode');
