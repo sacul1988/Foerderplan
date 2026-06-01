@@ -1176,7 +1176,8 @@ function saveHistorySnapshot(studentIndex, subject) {
     date: dateStr,
     subject: subject || null,
     label: `Förderplan ${dateStr}`,
-    plans: JSON.parse(JSON.stringify(student.plans))
+    plans: JSON.parse(JSON.stringify(student.plans)),
+    stammdaten: JSON.parse(JSON.stringify(student.stammdaten || {}))
   };
   student.history.unshift(entry);
   return entry;
@@ -1475,6 +1476,29 @@ function openStammdatenEdit() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function parseDEDate(str) {
+  const [d, m, y] = str.split('.');
+  return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+}
+
+function updateHistoryStammdatenForCurrentSchuljahr(studentIdx) {
+  const student = state.students[studentIdx];
+  if (!student.history || student.history.length === 0) return;
+  const sj = loadZeitraum().schuljahr || {};
+  if (!sj.von && !sj.bis) return; // Kein Schuljahr gesetzt → nichts aktualisieren
+  const newSd = JSON.parse(JSON.stringify(student.stammdaten || {}));
+  student.history.forEach(entry => {
+    if (!entry.date) return;
+    try {
+      const entryDate = parseDEDate(entry.date);
+      const inSchuljahr =
+        (!sj.von || entryDate >= sj.von) &&
+        (!sj.bis || entryDate <= sj.bis);
+      if (inSchuljahr) entry.stammdaten = newSd;
+    } catch (e) { /* skip unparseable dates */ }
+  });
+}
+
 function saveStammdatenEdit() {
   const idx = state.students.findIndex(s => s.id === state.selectedStudentId);
   if (idx === -1) return;
@@ -1496,6 +1520,7 @@ function saveStammdatenEdit() {
     bemerkungen:          val('anlegen-bemerkungen'),
   };
   state.students[idx].stammdatenConfirmed = true;
+  updateHistoryStammdatenForCurrentSchuljahr(idx);
   storage.saveData(state.students);
   state.stammdatenEditMode = false;
   state.stammdatenConfirmed = true;
@@ -1921,7 +1946,7 @@ function renderStudentDashboardTiles(student) {
       const entry = history.find(h => h.id === row.dataset.entryId);
       if (!entry) return;
       try {
-        const tempStudent = { name: student.name, plans: entry.plans };
+        const tempStudent = { name: student.name, plans: entry.plans, stammdaten: entry.stammdaten || student.stammdaten || {} };
         const doc = generateFoerderplan(tempStudent, entry.date);
         showPDFPreview(doc, row.dataset.filename);
       } catch (err) {
