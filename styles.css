@@ -1872,10 +1872,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 #verwaltung-view,
-#zeitraum-view {
+#schueler-verwaltung-view,
+#zeitraum-view,
+#uebersicht-view {
   flex-grow: 1;
   padding: 24px 0;
   gap: 28px;
+}
+
+.schueler-tiles-grid {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 #verwaltung-view .home-tiles-grid {
@@ -1884,6 +1890,131 @@ h1, h2, h3, h4, h5, h6 {
 
 .verwaltung-tiles-grid {
   grid-template-columns: repeat(3, 1fr);
+}
+
+/* --- Übersicht / Status --- */
+.home-tile-icon--uebersicht {
+  background-color: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  color: #7c3aed;
+}
+
+.uebersicht-container {
+  width: 100%;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.uebersicht-card {
+  flex-grow: 1;
+  gap: 20px;
+}
+
+.uebersicht-header-row,
+.uebersicht-student-row {
+  display: grid;
+  grid-template-columns: 2fr repeat(4, minmax(90px, 1fr));
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+}
+
+.uebersicht-header-row {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  margin-bottom: 8px;
+}
+
+.uebersicht-subject-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.uebersicht-subject-label[data-subject="allgemein"] { color: var(--color-allgemein); }
+.uebersicht-subject-label[data-subject="mathe"]     { color: var(--color-mathe); }
+.uebersicht-subject-label[data-subject="englisch"]  { color: var(--color-englisch); }
+.uebersicht-subject-label[data-subject="deutsch"]   { color: var(--color-deutsch); }
+
+.uebersicht-student-row {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  margin-bottom: 6px;
+  transition: background-color var(--transition-fast);
+}
+
+.uebersicht-student-row:last-child {
+  margin-bottom: 0;
+}
+
+.uebersicht-student-row:hover {
+  background-color: var(--bg-hover);
+}
+
+.uebersicht-student-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.uebersicht-student-name span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.uebersicht-status-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-badge-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  border-radius: 99px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-badge-open {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--bg-primary);
+  color: var(--text-muted);
+  border: 1px dashed var(--border-color);
+  border-radius: 99px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.uebersicht-summary {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.uebersicht-summary strong {
+  color: var(--text-primary);
 }
 
 /* --- Keyframe Animations --- */

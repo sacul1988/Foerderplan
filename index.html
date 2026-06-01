@@ -67,11 +67,31 @@
           <div class="home-tile-title">Zeiträume festlegen</div>
           <div class="home-tile-desc">Schuljahre und Förderperioden definieren</div>
         </button>
-        <button class="home-tile home-tile--disabled" type="button" disabled>
-          <div class="home-tile-icon home-tile-icon--disabled">&#220;</div>
+        <button class="home-tile" id="verwaltung-tile-uebersicht" type="button">
+          <div class="home-tile-icon home-tile-icon--uebersicht">&#220;</div>
           <div class="home-tile-title">Übersicht / Status</div>
           <div class="home-tile-desc">Gesamtübersicht aller Schüler und Förderpläne</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= SCHÜLER VERWALTUNG SUB-VIEW ================= -->
+    <div class="home-view" id="schueler-verwaltung-view">
+      <div class="subview-header">
+        <button type="button" class="btn-back-circle" id="btn-back-from-schueler-verwaltung">&#8592;</button>
+        <h2 class="home-title">Schüler verwalten</h2>
+      </div>
+      <div class="home-tiles-grid schueler-tiles-grid">
+        <button class="home-tile home-tile--disabled" type="button" disabled>
+          <div class="home-tile-icon home-tile-icon--disabled">+</div>
+          <div class="home-tile-title">Schüler neu anlegen</div>
+          <div class="home-tile-desc">Neuen Schüler zur Liste hinzufügen</div>
           <span class="coming-soon-badge">Kommt bald</span>
+        </button>
+        <button class="home-tile" id="schueler-tile-verwalten" type="button">
+          <div class="home-tile-icon home-tile-icon--verwaltung">S</div>
+          <div class="home-tile-title">Schüler verwalten</div>
+          <div class="home-tile-desc">Schülerliste einsehen und bearbeiten</div>
         </button>
       </div>
     </div>
@@ -97,6 +117,20 @@
           </div>
           <div id="zeitraum-status" class="zeitraum-status"></div>
           <button type="button" class="btn-save-fab" id="btn-save-zeitraum" title="Speichern">&#10003;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= ÜBERSICHT / STATUS VIEW ================= -->
+    <div class="home-view" id="uebersicht-view">
+      <div class="subview-header">
+        <button type="button" class="btn-back-circle" id="btn-back-from-uebersicht">&#8592;</button>
+        <h2 class="home-title">Übersicht / Status</h2>
+      </div>
+      <div class="uebersicht-container">
+        <div class="glass-card uebersicht-card">
+          <div id="uebersicht-zeitraum-bar"></div>
+          <div id="uebersicht-table-wrap"></div>
         </div>
       </div>
     </div>
@@ -189,6 +223,42 @@
         <div class="subject-tile-header" data-subject="alte-foerderplaene">Alle Förderpläne (PDF)</div>
         <div class="subject-tile-body">
           <p class="tile-empty-state">Vergangene Förderpläne werden hier gesammelt.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= VIEW 1.6: SCHÜLER VERWALTUNGS-DASHBOARD ================= -->
+    <section id="schueler-detail-verwaltung-view" class="glass-card student-dashboard-view" aria-labelledby="schueler-detail-verwaltung-title">
+      <div class="student-dashboard-header">
+        <div class="student-dashboard-title-block">
+          <button type="button" id="btn-back-from-schueler-detail" class="btn-back-circle" title="Zurück">&#8592;</button>
+          <h2 id="schueler-detail-verwaltung-title" class="workspace-title">Schüler</h2>
+        </div>
+      </div>
+
+      <!-- Stammdaten -->
+      <div class="subject-tile stammdaten-tile">
+        <div class="subject-tile-header" data-subject="stammdaten">Stammdaten</div>
+        <div class="subject-tile-body">
+          <p class="tile-empty-state">Stammdaten werden hier ergänzt.</p>
+        </div>
+      </div>
+
+      <!-- Verwaltungs-Kacheln -->
+      <div class="subject-tiles-grid">
+        <div class="subject-tile home-tile--disabled" style="pointer-events:none; opacity:0.5;">
+          <div class="subject-tile-header" data-subject="alte-foerderplaene">Schüler bearbeiten</div>
+          <div class="subject-tile-body">
+            <p class="tile-empty-state">Schülerdaten anpassen</p>
+            <span class="coming-soon-badge" style="display:block; text-align:center; margin-top:8px;">Kommt bald</span>
+          </div>
+        </div>
+        <div class="subject-tile home-tile--disabled" style="pointer-events:none; opacity:0.5;">
+          <div class="subject-tile-header" data-subject="alte-foerderplaene">Schüler archivieren</div>
+          <div class="subject-tile-body">
+            <p class="tile-empty-state">Schüler aus der aktiven Liste entfernen</p>
+            <span class="coming-soon-badge" style="display:block; text-align:center; margin-top:8px;">Kommt bald</span>
+          </div>
         </div>
       </div>
     </section>

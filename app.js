@@ -391,7 +391,16 @@ const DOM = {
   verwaltungView: document.getElementById('verwaltung-view'),
   verwaltungTileSchueler: document.getElementById('verwaltung-tile-schueler'),
   verwaltungTileZeitraum: document.getElementById('verwaltung-tile-zeitraum'),
+  verwaltungTileUebersicht: document.getElementById('verwaltung-tile-uebersicht'),
   btnBackFromVerwaltung: document.getElementById('btn-back-from-verwaltung'),
+  uebersichtView: document.getElementById('uebersicht-view'),
+  btnBackFromUebersicht: document.getElementById('btn-back-from-uebersicht'),
+  schuelerVerwaltungView: document.getElementById('schueler-verwaltung-view'),
+  schuelerTileVerwalten: document.getElementById('schueler-tile-verwalten'),
+  btnBackFromSchuelerVerwaltung: document.getElementById('btn-back-from-schueler-verwaltung'),
+  schuelerDetailVerwaltungView: document.getElementById('schueler-detail-verwaltung-view'),
+  schuelerDetailVerwaltungTitle: document.getElementById('schueler-detail-verwaltung-title'),
+  btnBackFromSchuelerDetail: document.getElementById('btn-back-from-schueler-detail'),
   btnBackFromList: document.getElementById('btn-back-from-list'),
   zeitraumView: document.getElementById('zeitraum-view'),
   btnBackFromZeitraum: document.getElementById('btn-back-from-zeitraum'),
@@ -1338,8 +1347,103 @@ function renderSubjectDetailContent(student, subject) {
   }).join('');
 }
 
+// --- Übersicht / Status ---
+function navigateToUebersicht() {
+  renderUebersicht();
+  DOM.verwaltungView.classList.remove('active');
+  DOM.uebersichtView.classList.add('active');
+}
+
+function renderUebersicht() {
+  const subjects = ['allgemein', 'mathe', 'englisch', 'deutsch'];
+  const subjectLabels = { allgemein: 'Allgemein', mathe: 'Mathe', englisch: 'Englisch', deutsch: 'Deutsch' };
+
+  const zeitraum = loadZeitraum();
+  const zeitraumBar = document.getElementById('uebersicht-zeitraum-bar');
+  if (zeitraum && (zeitraum.von || zeitraum.bis)) {
+    const aktiv = isZeitraumAktiv(zeitraum);
+    const vonStr = zeitraum.von ? new Date(zeitraum.von).toLocaleDateString('de-DE') : '–';
+    const bisStr = zeitraum.bis ? new Date(zeitraum.bis).toLocaleDateString('de-DE') : '–';
+    zeitraumBar.innerHTML = `
+      <div class="zeitraum-status-info ${aktiv ? 'zeitraum-aktiv' : 'zeitraum-inaktiv'}">
+        <div class="zeitraum-status-label">${aktiv ? 'Zeitraum aktiv' : 'Zeitraum inaktiv'}</div>
+        <div class="zeitraum-status-range">Von: ${vonStr} &nbsp;·&nbsp; Bis: ${bisStr}</div>
+      </div>`;
+  } else {
+    zeitraumBar.innerHTML = `<p style="font-size:0.85rem;color:var(--text-muted);">Kein Zeitraum festgelegt.</p>`;
+  }
+
+  const wrap = document.getElementById('uebersicht-table-wrap');
+
+  if (state.students.length === 0) {
+    wrap.innerHTML = `<div class="empty-state"><p class="empty-state-text">Keine Schüler vorhanden.</p></div>`;
+    return;
+  }
+
+  function hasPlan(student, subject) {
+    const plans = student.plans[subject] || {};
+    return Object.keys(plans).some(g => {
+      const val = plans[g];
+      return val && (typeof val === 'object' ? val.level > 0 : val > 0);
+    });
+  }
+
+  const headerCells = subjects.map(s =>
+    `<div class="uebersicht-subject-label" data-subject="${s}">${subjectLabels[s]}</div>`
+  ).join('');
+
+  const rows = state.students.map(student => {
+    const initials = student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    const cells = subjects.map(subject => {
+      const done = hasPlan(student, subject);
+      return `<div class="uebersicht-status-cell">
+        ${done
+          ? `<span class="status-badge-done">&#10003; Vorhanden</span>`
+          : `<span class="status-badge-open">Offen</span>`}
+      </div>`;
+    }).join('');
+
+    return `
+      <div class="uebersicht-student-row">
+        <div class="uebersicht-student-name">
+          <div class="student-avatar">${escapeHTML(initials)}</div>
+          <span>${escapeHTML(student.name)}</span>
+        </div>
+        ${cells}
+      </div>`;
+  }).join('');
+
+  const completeCount = state.students.filter(s => subjects.every(sub => hasPlan(s, sub))).length;
+
+  wrap.innerHTML = `
+    <div class="uebersicht-header-row">
+      <div></div>
+      ${headerCells}
+    </div>
+    ${rows}
+    <div class="uebersicht-summary">
+      <strong>${completeCount} von ${state.students.length}</strong> Schülern haben alle 4 Förderpläne
+    </div>`;
+}
+
+// --- Schüler Verwaltungs-Dashboard ---
+function openSchuelerDetailVerwaltung(studentId) {
+  const student = state.students.find(s => s.id === studentId);
+  if (!student) return;
+  state.selectedStudentId = studentId;
+  DOM.schuelerDetailVerwaltungTitle.textContent = student.name;
+  DOM.dashboardGrid.classList.add('hidden');
+  DOM.schuelerDetailVerwaltungView.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 // --- Student Dashboard ---
 function openStudentDashboard(studentId) {
+  if (state.mode === 'verwaltung') {
+    openSchuelerDetailVerwaltung(studentId);
+    return;
+  }
+
   const student = state.students.find(s => s.id === studentId);
   if (!student) return;
 
@@ -1499,8 +1603,25 @@ function setupEventListeners() {
   });
 
   // Verwaltung sub-tiles
-  DOM.verwaltungTileSchueler.addEventListener('click', navigateToSchuelerVerwalten);
+  DOM.verwaltungTileSchueler.addEventListener('click', navigateToSchuelerVerwaltung);
+  DOM.schuelerTileVerwalten.addEventListener('click', navigateToSchuelerVerwalten);
+  DOM.btnBackFromSchuelerVerwaltung.addEventListener('click', () => {
+    DOM.schuelerVerwaltungView.classList.remove('active');
+    DOM.verwaltungView.classList.add('active');
+  });
+
+  DOM.btnBackFromSchuelerDetail.addEventListener('click', () => {
+    DOM.schuelerDetailVerwaltungView.classList.remove('active');
+    DOM.dashboardGrid.classList.remove('hidden');
+    DOM.studentSearch.value = '';
+    filterStudents('');
+  });
   DOM.verwaltungTileZeitraum.addEventListener('click', navigateToZeitraum);
+  DOM.verwaltungTileUebersicht.addEventListener('click', navigateToUebersicht);
+  DOM.btnBackFromUebersicht.addEventListener('click', () => {
+    DOM.uebersichtView.classList.remove('active');
+    DOM.verwaltungView.classList.add('active');
+  });
   DOM.btnBackFromVerwaltung.addEventListener('click', showHomeView);
 
   // Zeitraum form
@@ -1731,6 +1852,11 @@ function setHeader(text) {
 }
 
 // --- Home Navigation ---
+function navigateToSchuelerVerwaltung() {
+  DOM.verwaltungView.classList.remove('active');
+  DOM.schuelerVerwaltungView.classList.add('active');
+}
+
 function navigateToZeitraum() {
   const zeitraum = loadZeitraum();
   fpVon.setDate(zeitraum?.von || null);
@@ -1749,7 +1875,10 @@ function showHomeView() {
   setHeader('Förderplan · Assistent');
   DOM.homeView.classList.add('active');
   DOM.verwaltungView.classList.remove('active');
+  DOM.schuelerVerwaltungView.classList.remove('active');
+  DOM.schuelerDetailVerwaltungView.classList.remove('active');
   DOM.zeitraumView.classList.remove('active');
+  DOM.uebersichtView.classList.remove('active');
   DOM.dashboardGrid.classList.add('hidden');
   DOM.dashboardGrid.classList.remove('einsehen-mode');
   DOM.studentDashboardView.classList.remove('active');
@@ -1779,6 +1908,7 @@ function navigateToVerwaltung() {
 
 function navigateToSchuelerVerwalten() {
   DOM.verwaltungView.classList.remove('active');
+  DOM.schuelerVerwaltungView.classList.remove('active');
   DOM.dashboardGrid.classList.add('einsehen-mode');
   DOM.dashboardGrid.classList.remove('hidden');
 }
