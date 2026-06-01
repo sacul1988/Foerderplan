@@ -390,7 +390,17 @@ const DOM = {
   homeTileEinsehen: document.getElementById('home-tile-einsehen'),
   verwaltungView: document.getElementById('verwaltung-view'),
   verwaltungTileSchueler: document.getElementById('verwaltung-tile-schueler'),
+  verwaltungTileZeitraum: document.getElementById('verwaltung-tile-zeitraum'),
   btnBackFromVerwaltung: document.getElementById('btn-back-from-verwaltung'),
+  btnBackFromList: document.getElementById('btn-back-from-list'),
+  zeitraumView: document.getElementById('zeitraum-view'),
+  btnBackFromZeitraum: document.getElementById('btn-back-from-zeitraum'),
+  zeitraumVon: document.getElementById('zeitraum-von'),
+  zeitraumBis: document.getElementById('zeitraum-bis'),
+  btnSaveZeitraum: document.getElementById('btn-save-zeitraum'),
+  zeitraumStatus: document.getElementById('zeitraum-status'),
+  homeTileErstellenDesc: document.getElementById('home-tile-erstellen-desc'),
+  homeTileErstellenHint: document.getElementById('home-tile-erstellen-hint'),
   logoHomeBtn: document.getElementById('logo-home-btn'),
   studentForm: document.getElementById('student-form'),
   studentNameInput: document.getElementById('student-name'),
@@ -1471,12 +1481,40 @@ function renderStudentDashboardTiles(student) {
 function setupEventListeners() {
   // Home tiles
   DOM.homeTileVerwaltung.addEventListener('click', navigateToVerwaltung);
-  DOM.homeTileErstellen.addEventListener('click', navigateToApp);
+  DOM.homeTileErstellen.addEventListener('click', () => {
+    if (!DOM.homeTileErstellen.classList.contains('home-tile--locked')) navigateToApp();
+  });
   DOM.homeTileEinsehen.addEventListener('click', navigateToEinsehen);
+
+  // Zurück-Button in der Schülerübersicht
+  DOM.btnBackFromList.addEventListener('click', () => {
+    DOM.studentSearch.value = '';
+    filterStudents('');
+    if (state.mode === 'einsehen') {
+      showHomeView();
+    } else {
+      DOM.dashboardGrid.classList.add('hidden');
+      DOM.verwaltungView.classList.add('active');
+    }
+  });
 
   // Verwaltung sub-tiles
   DOM.verwaltungTileSchueler.addEventListener('click', navigateToSchuelerVerwalten);
+  DOM.verwaltungTileZeitraum.addEventListener('click', navigateToZeitraum);
   DOM.btnBackFromVerwaltung.addEventListener('click', showHomeView);
+
+  // Zeitraum form
+  DOM.btnBackFromZeitraum.addEventListener('click', navigateBackFromZeitraum);
+  DOM.btnSaveZeitraum.addEventListener('click', () => {
+    const von = DOM.zeitraumVon.value;
+    const bis = DOM.zeitraumBis.value;
+    if (!von && !bis) { showToast('Bitte mindestens ein Datum eingeben.', 'error'); return; }
+    if (von && bis && von > bis) { showToast('"Von" darf nicht nach "Bis" liegen.', 'error'); return; }
+    saveZeitraumData(von, bis);
+    renderZeitraumStatus();
+    updateHomeTileErstellen();
+    showToast('Zeitraum gespeichert.');
+  });
 
   // Student search live filter
   DOM.studentSearch.addEventListener('input', () => {
@@ -1620,6 +1658,72 @@ function setupEventListeners() {
   });
 }
 
+// --- Zeitraum Storage & Logic ---
+function loadZeitraum() {
+  try {
+    const stored = localStorage.getItem('foerderplan_zeitraum');
+    return stored ? JSON.parse(stored) : null;
+  } catch(e) { return null; }
+}
+
+function saveZeitraumData(von, bis) {
+  localStorage.setItem('foerderplan_zeitraum', JSON.stringify({ von, bis }));
+}
+
+function clearZeitraumData() {
+  localStorage.removeItem('foerderplan_zeitraum');
+}
+
+function isZeitraumAktiv(zeitraum) {
+  if (!zeitraum || (!zeitraum.von && !zeitraum.bis)) return true;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const von = zeitraum.von ? new Date(zeitraum.von) : null;
+  const bis = zeitraum.bis ? new Date(zeitraum.bis) : null;
+  return (!von || now >= von) && (!bis || now <= bis);
+}
+
+function updateHomeTileErstellen() {
+  const zeitraum = loadZeitraum();
+  const aktiv = isZeitraumAktiv(zeitraum);
+  const tile = DOM.homeTileErstellen;
+  const hint = DOM.homeTileErstellenHint;
+  const desc = DOM.homeTileErstellenDesc;
+
+  if (aktiv) {
+    tile.classList.remove('home-tile--locked');
+    desc.style.display = '';
+    hint.style.display = 'none';
+  } else {
+    tile.classList.add('home-tile--locked');
+    desc.style.display = 'none';
+    hint.style.display = '';
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const von = zeitraum.von ? new Date(zeitraum.von) : null;
+    if (von && now < von) {
+      hint.textContent = `Anlegen möglich ab ${von.toLocaleDateString('de-DE')}`;
+    } else {
+      hint.textContent = 'Zeitraum abgelaufen';
+    }
+  }
+}
+
+function renderZeitraumStatus() {
+  const zeitraum = loadZeitraum();
+  const el = DOM.zeitraumStatus;
+  if (!zeitraum || (!zeitraum.von && !zeitraum.bis)) {
+    el.innerHTML = '';
+    return;
+  }
+  const aktiv = isZeitraumAktiv(zeitraum);
+  const vonStr = zeitraum.von ? new Date(zeitraum.von).toLocaleDateString('de-DE') : '–';
+  const bisStr = zeitraum.bis ? new Date(zeitraum.bis).toLocaleDateString('de-DE') : '–';
+  el.innerHTML = `
+    <div class="zeitraum-status-info ${aktiv ? 'zeitraum-aktiv' : 'zeitraum-inaktiv'}">
+      <div class="zeitraum-status-label">${aktiv ? 'Zeitraum aktiv' : 'Zeitraum inaktiv'}</div>
+      <div class="zeitraum-status-range">Von: ${vonStr} &nbsp;·&nbsp; Bis: ${bisStr}</div>
+    </div>`;
+}
+
 // --- Header ---
 function setHeader(text) {
   const el = document.getElementById('logo-text');
@@ -1627,10 +1731,25 @@ function setHeader(text) {
 }
 
 // --- Home Navigation ---
+function navigateToZeitraum() {
+  const zeitraum = loadZeitraum();
+  fpVon.setDate(zeitraum?.von || null);
+  fpBis.setDate(zeitraum?.bis || null);
+  renderZeitraumStatus();
+  DOM.verwaltungView.classList.remove('active');
+  DOM.zeitraumView.classList.add('active');
+}
+
+function navigateBackFromZeitraum() {
+  DOM.zeitraumView.classList.remove('active');
+  DOM.verwaltungView.classList.add('active');
+}
+
 function showHomeView() {
-  setHeader('Förderplan-Assistent');
+  setHeader('Förderplan · Assistent');
   DOM.homeView.classList.add('active');
   DOM.verwaltungView.classList.remove('active');
+  DOM.zeitraumView.classList.remove('active');
   DOM.dashboardGrid.classList.add('hidden');
   DOM.dashboardGrid.classList.remove('einsehen-mode');
   DOM.studentDashboardView.classList.remove('active');
@@ -1672,11 +1791,29 @@ function navigateToEinsehen() {
   DOM.dashboardGrid.classList.remove('hidden');
 }
 
+// --- Flatpickr Date Pickers ---
+let fpVon, fpBis;
+
+function initDatePickers() {
+  const options = {
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'd.m.Y',
+    altInputClass: 'form-input zeitraum-date-input',
+    locale: 'de',
+    disableMobile: true
+  };
+  fpVon = flatpickr(DOM.zeitraumVon, options);
+  fpBis = flatpickr(DOM.zeitraumBis, options);
+}
+
 // --- Init ---
 function init() {
   state.students = storage.loadData();
   setupEventListeners();
   renderStudents();
+  updateHomeTileErstellen();
+  initDatePickers();
 }
 
 document.addEventListener('DOMContentLoaded', init);

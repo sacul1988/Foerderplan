@@ -8,7 +8,10 @@
   
   <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  
+
+  <!-- Flatpickr -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -18,7 +21,7 @@
   <header class="app-header">
     <div class="logo-container" id="logo-home-btn" role="button" tabindex="0" title="Zur Startseite" style="cursor:pointer;">
       <div class="logo-badge">FP</div>
-      <h1 class="logo-text">Förderplan-Assistent</h1>
+      <h1 class="logo-text" id="logo-text">Förderplan · Assistent</h1>
     </div>
   </header>
 
@@ -27,10 +30,6 @@
 
     <!-- ================= HOME VIEW ================= -->
     <div class="home-view active" id="home-view">
-      <div class="home-welcome">
-        <h2 class="home-title">Förderplan-Assistent</h2>
-        <p class="home-subtitle">Wähle einen Bereich, um fortzufahren.</p>
-      </div>
       <div class="home-tiles-grid">
         <button class="home-tile" id="home-tile-verwaltung" type="button">
           <div class="home-tile-icon home-tile-icon--verwaltung">V</div>
@@ -40,7 +39,8 @@
         <button class="home-tile" id="home-tile-erstellen" type="button">
           <div class="home-tile-icon home-tile-icon--erstellen">+</div>
           <div class="home-tile-title">Förderpläne erstellen</div>
-          <div class="home-tile-desc">Neue Förderpläne für Schülerinnen und Schüler anlegen</div>
+          <div class="home-tile-desc" id="home-tile-erstellen-desc">Neue Förderpläne für Schülerinnen und Schüler anlegen</div>
+          <span class="home-tile-hint" id="home-tile-erstellen-hint" style="display:none;"></span>
         </button>
         <button class="home-tile" id="home-tile-einsehen" type="button">
           <div class="home-tile-icon home-tile-icon--einsehen">E</div>
@@ -62,11 +62,10 @@
           <div class="home-tile-title">Schüler verwalten</div>
           <div class="home-tile-desc">Schüler hinzufügen, archivieren und löschen</div>
         </button>
-        <button class="home-tile home-tile--disabled" type="button" disabled>
-          <div class="home-tile-icon home-tile-icon--disabled">Z</div>
+        <button class="home-tile" id="verwaltung-tile-zeitraum" type="button">
+          <div class="home-tile-icon home-tile-icon--zeitraum">Z</div>
           <div class="home-tile-title">Zeiträume festlegen</div>
           <div class="home-tile-desc">Schuljahre und Förderperioden definieren</div>
-          <span class="coming-soon-badge">Kommt bald</span>
         </button>
         <button class="home-tile home-tile--disabled" type="button" disabled>
           <div class="home-tile-icon home-tile-icon--disabled">&#220;</div>
@@ -74,6 +73,31 @@
           <div class="home-tile-desc">Gesamtübersicht aller Schüler und Förderpläne</div>
           <span class="coming-soon-badge">Kommt bald</span>
         </button>
+      </div>
+    </div>
+
+    <!-- ================= ZEITRAUM VIEW ================= -->
+    <div class="home-view" id="zeitraum-view">
+      <div class="subview-header">
+        <button type="button" class="btn-back-circle" id="btn-back-from-zeitraum">&#8592;</button>
+        <h2 class="home-title">Zeiträume festlegen</h2>
+      </div>
+      <div class="zeitraum-container">
+        <div class="glass-card zeitraum-card">
+          <p class="zeitraum-description">Lege fest, in welchem Zeitraum Förderpläne angelegt werden können. Außerhalb dieses Zeitraums ist die Kachel <strong>Förderpläne erstellen</strong> gesperrt.</p>
+          <div class="zeitraum-inputs">
+            <div class="form-group">
+              <label class="form-label" for="zeitraum-von">Von</label>
+              <input type="date" class="form-input zeitraum-date-input" id="zeitraum-von">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="zeitraum-bis">Bis</label>
+              <input type="date" class="form-input zeitraum-date-input" id="zeitraum-bis">
+            </div>
+          </div>
+          <div id="zeitraum-status" class="zeitraum-status"></div>
+          <button type="button" class="btn-save-fab" id="btn-save-zeitraum" title="Speichern">&#10003;</button>
+        </div>
       </div>
     </div>
 
@@ -96,7 +120,10 @@
 
       <!-- Right Column: Student List -->
       <section class="glass-card" aria-labelledby="student-list-title">
-        <h2 id="student-list-title" class="card-title">Schülerübersicht</h2>
+        <div class="student-list-header">
+          <button type="button" class="btn-back-circle student-list-back-btn" id="btn-back-from-list" title="Zurück">&#8592;</button>
+          <h2 id="student-list-title">Schülerübersicht</h2>
+        </div>
 
         <div class="student-search-container">
           <svg class="student-search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -319,6 +346,10 @@
   <!-- PDF Generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Flatpickr -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/de.js"></script>
 
   <!-- JavaScript App Logic -->
   <script src="./measures.js"></script>
