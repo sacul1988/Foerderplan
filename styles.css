@@ -1674,9 +1674,9 @@ h1, h2, h3, h4, h5, h6 {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  border: none;
-  background: #2563eb;
-  color: white;
+  border: 2px solid #1e293b;
+  background: white;
+  color: #1e293b;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1686,11 +1686,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-header-verwaltung:hover {
-  background: #1d4ed8;
+  background: #f1f5f9;
   box-shadow: var(--shadow-sm);
 }
 
-#home-tile-erstellen .home-tile-hint {
+#home-tile-erstellen .home-tile-hint,
+#home-tile-gespraeche .home-tile-hint {
   background-color: rgba(255, 255, 255, 0.2);
   color: white;
 }

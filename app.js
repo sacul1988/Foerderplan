@@ -2094,6 +2094,7 @@ function setupEventListeners() {
     saveZeitraumData(data);
     renderZeitraumStatus();
     updateHomeTileErstellen();
+    updateHomeTileGespraeche();
     renderFristenTile();
     showToast('Zeiträume gespeichert.');
   });
@@ -2338,6 +2339,20 @@ function updateHomeTileErstellen() {
   }
 }
 
+function updateHomeTileGespraeche() {
+  const hint = document.getElementById('home-tile-gespraeche-hint');
+  if (!hint) return;
+  const eg = loadZeitraum()?.elterngespraeche || {};
+  if (eg.von || eg.bis) {
+    const vonStr = eg.von ? formatDate(eg.von) : '–';
+    const bisStr = eg.bis ? formatDate(eg.bis) : '–';
+    hint.textContent = `${vonStr} – ${bisStr}`;
+    hint.style.display = '';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
 function renderZeitraumStatus() {
   const zeitraum = loadZeitraum();
   const fp = zeitraum?.foerderplan || {};
@@ -2419,6 +2434,8 @@ function showHomeView() {
   setHeader('Förderplan · Assistent');
   renderHomeUebersicht();
   renderFristenTile();
+  updateHomeTileGespraeche();
+  setGearButtonVisible(true);
   DOM.homeView.classList.add('active');
   DOM.verwaltungView.classList.remove('active');
   DOM.schuelerVerwaltungView.classList.remove('active');
@@ -2440,12 +2457,18 @@ function showHomeView() {
   state.mode = null;
 }
 
+function setGearButtonVisible(visible) {
+  const btn = document.getElementById('btn-verwaltung-header');
+  if (btn) btn.style.display = visible ? '' : 'none';
+}
+
 function navigateToApp() {
   setHeader('Förderplan · Erstellen');
   state.mode = 'erstellen';
   DOM.homeView.classList.remove('active');
   DOM.dashboardGrid.classList.add('einsehen-mode');
   DOM.dashboardGrid.classList.remove('hidden');
+  setGearButtonVisible(false);
 }
 
 function navigateToVerwaltung() {
@@ -2460,6 +2483,7 @@ function navigateToSchuelerVerwalten() {
   DOM.schuelerVerwaltungView.classList.remove('active');
   DOM.dashboardGrid.classList.add('einsehen-mode');
   DOM.dashboardGrid.classList.remove('hidden');
+  setGearButtonVisible(false);
 }
 
 function navigateToEinsehen() {
@@ -2468,6 +2492,7 @@ function navigateToEinsehen() {
   DOM.homeView.classList.remove('active');
   DOM.dashboardGrid.classList.add('einsehen-mode');
   DOM.dashboardGrid.classList.remove('hidden');
+  setGearButtonVisible(false);
 }
 
 // --- Flatpickr Date Pickers ---
@@ -2496,6 +2521,7 @@ function init() {
   setupEventListeners();
   renderStudents();
   updateHomeTileErstellen();
+  updateHomeTileGespraeche();
   initDatePickers();
   renderHomeUebersicht();
   renderFristenTile();
