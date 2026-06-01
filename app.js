@@ -1391,7 +1391,7 @@ function renderHomeUebersicht() {
       .join('');
 
     return `
-      <div class="home-uebersicht-entry">
+      <div class="home-uebersicht-entry" data-student-id="${escapeHTML(student.id)}">
         <div class="student-avatar">${escapeHTML(initials)}</div>
         <div class="home-uebersicht-entry-info">
           <div class="home-uebersicht-name">${escapeHTML(student.name)}</div>
@@ -1416,8 +1416,8 @@ function renderUebersicht() {
   const zeitraumBar = document.getElementById('uebersicht-zeitraum-bar');
   if (zeitraum && (zeitraum.von || zeitraum.bis)) {
     const aktiv = isZeitraumAktiv(zeitraum);
-    const vonStr = zeitraum.von ? new Date(zeitraum.von).toLocaleDateString('de-DE') : '–';
-    const bisStr = zeitraum.bis ? new Date(zeitraum.bis).toLocaleDateString('de-DE') : '–';
+    const vonStr = zeitraum.von ? formatDate(zeitraum.von) : '–';
+    const bisStr = zeitraum.bis ? formatDate(zeitraum.bis) : '–';
     zeitraumBar.innerHTML = `
       <div class="zeitraum-status-info ${aktiv ? 'zeitraum-aktiv' : 'zeitraum-inaktiv'}">
         <div class="zeitraum-status-label">${aktiv ? 'Zeitraum aktiv' : 'Zeitraum inaktiv'}</div>
@@ -1663,6 +1663,15 @@ function setupEventListeners() {
     DOM.studentSearch.value = '';
     filterStudents('');
   });
+  document.getElementById('home-uebersicht-list').addEventListener('click', (e) => {
+    const entry = e.target.closest('[data-student-id]');
+    if (!entry) return;
+    state.mode = 'default';
+    DOM.homeView.classList.remove('active');
+    DOM.dashboardGrid.classList.remove('einsehen-mode');
+    openStudentDashboard(entry.dataset.studentId);
+  });
+
   DOM.verwaltungTileZeitraum.addEventListener('click', navigateToZeitraum);
   DOM.verwaltungTileUebersicht.addEventListener('click', navigateToUebersicht);
   DOM.btnBackFromUebersicht.addEventListener('click', () => {
@@ -1842,12 +1851,20 @@ function clearZeitraumData() {
   localStorage.removeItem('foerderplan_zeitraum');
 }
 
+function todayStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function formatDate(str) {
+  const [y, m, d] = str.split('-');
+  return `${d}.${m}.${y}`;
+}
+
 function isZeitraumAktiv(zeitraum) {
   if (!zeitraum || (!zeitraum.von && !zeitraum.bis)) return true;
-  const now = new Date(); now.setHours(0, 0, 0, 0);
-  const von = zeitraum.von ? new Date(zeitraum.von) : null;
-  const bis = zeitraum.bis ? new Date(zeitraum.bis) : null;
-  return (!von || now >= von) && (!bis || now <= bis);
+  const today = todayStr();
+  return (!zeitraum.von || today >= zeitraum.von) && (!zeitraum.bis || today <= zeitraum.bis);
 }
 
 function updateHomeTileErstellen() {
@@ -1865,10 +1882,9 @@ function updateHomeTileErstellen() {
     tile.classList.add('home-tile--locked');
     desc.style.display = 'none';
     hint.style.display = '';
-    const now = new Date(); now.setHours(0, 0, 0, 0);
-    const von = zeitraum.von ? new Date(zeitraum.von) : null;
-    if (von && now < von) {
-      hint.textContent = `Anlegen möglich ab ${von.toLocaleDateString('de-DE')}`;
+    const today = todayStr();
+    if (zeitraum.von && today < zeitraum.von) {
+      hint.textContent = `Anlegen möglich ab ${formatDate(zeitraum.von)}`;
     } else {
       hint.textContent = 'Zeitraum abgelaufen';
     }
@@ -1883,8 +1899,8 @@ function renderZeitraumStatus() {
     return;
   }
   const aktiv = isZeitraumAktiv(zeitraum);
-  const vonStr = zeitraum.von ? new Date(zeitraum.von).toLocaleDateString('de-DE') : '–';
-  const bisStr = zeitraum.bis ? new Date(zeitraum.bis).toLocaleDateString('de-DE') : '–';
+  const vonStr = zeitraum.von ? formatDate(zeitraum.von) : '–';
+  const bisStr = zeitraum.bis ? formatDate(zeitraum.bis) : '–';
   el.innerHTML = `
     <div class="zeitraum-status-info ${aktiv ? 'zeitraum-aktiv' : 'zeitraum-inaktiv'}">
       <div class="zeitraum-status-label">${aktiv ? 'Zeitraum aktiv' : 'Zeitraum inaktiv'}</div>
