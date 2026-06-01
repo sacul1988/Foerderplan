@@ -16,7 +16,7 @@
 
   <!-- App Header -->
   <header class="app-header">
-    <div class="logo-container">
+    <div class="logo-container" id="logo-home-btn" role="button" tabindex="0" title="Zur Startseite" style="cursor:pointer;">
       <div class="logo-badge">FP</div>
       <h1 class="logo-text">Förderplan-Assistent</h1>
     </div>
@@ -24,9 +24,61 @@
 
   <!-- Main Container -->
   <main class="main-container">
-    
+
+    <!-- ================= HOME VIEW ================= -->
+    <div class="home-view active" id="home-view">
+      <div class="home-welcome">
+        <h2 class="home-title">Förderplan-Assistent</h2>
+        <p class="home-subtitle">Wähle einen Bereich, um fortzufahren.</p>
+      </div>
+      <div class="home-tiles-grid">
+        <button class="home-tile" id="home-tile-verwaltung" type="button">
+          <div class="home-tile-icon home-tile-icon--verwaltung">V</div>
+          <div class="home-tile-title">Verwaltung</div>
+          <div class="home-tile-desc">Schülerinnen und Schüler anlegen und verwalten</div>
+        </button>
+        <button class="home-tile" id="home-tile-erstellen" type="button">
+          <div class="home-tile-icon home-tile-icon--erstellen">+</div>
+          <div class="home-tile-title">Förderpläne erstellen</div>
+          <div class="home-tile-desc">Neue Förderpläne für Schülerinnen und Schüler anlegen</div>
+        </button>
+        <button class="home-tile" id="home-tile-einsehen" type="button">
+          <div class="home-tile-icon home-tile-icon--einsehen">E</div>
+          <div class="home-tile-title">Förderpläne einsehen</div>
+          <div class="home-tile-desc">Bestehende Förderpläne ansehen und exportieren</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= VERWALTUNG SUB-VIEW ================= -->
+    <div class="home-view" id="verwaltung-view">
+      <div class="subview-header">
+        <button type="button" class="btn-back-circle" id="btn-back-from-verwaltung" title="Zurück zur Startseite">&#8592;</button>
+        <h2 class="home-title">Verwaltung</h2>
+      </div>
+      <div class="home-tiles-grid verwaltung-tiles-grid">
+        <button class="home-tile" id="verwaltung-tile-schueler" type="button">
+          <div class="home-tile-icon home-tile-icon--verwaltung">S</div>
+          <div class="home-tile-title">Schüler verwalten</div>
+          <div class="home-tile-desc">Schüler hinzufügen, archivieren und löschen</div>
+        </button>
+        <button class="home-tile home-tile--disabled" type="button" disabled>
+          <div class="home-tile-icon home-tile-icon--disabled">Z</div>
+          <div class="home-tile-title">Zeiträume festlegen</div>
+          <div class="home-tile-desc">Schuljahre und Förderperioden definieren</div>
+          <span class="coming-soon-badge">Kommt bald</span>
+        </button>
+        <button class="home-tile home-tile--disabled" type="button" disabled>
+          <div class="home-tile-icon home-tile-icon--disabled">&#220;</div>
+          <div class="home-tile-title">Übersicht / Status</div>
+          <div class="home-tile-desc">Gesamtübersicht aller Schüler und Förderpläne</div>
+          <span class="coming-soon-badge">Kommt bald</span>
+        </button>
+      </div>
+    </div>
+
     <!-- ================= VIEW 1: DASHBOARD ================= -->
-    <div class="dashboard-grid" id="dashboard-grid">
+    <div class="dashboard-grid hidden" id="dashboard-grid">
       <!-- Left Column: Add Student Form -->
       <section class="glass-card" aria-labelledby="add-student-title">
         <h2 id="add-student-title" class="card-title">Schüler anlegen</h2>
@@ -45,11 +97,22 @@
       <!-- Right Column: Student List -->
       <section class="glass-card" aria-labelledby="student-list-title">
         <h2 id="student-list-title" class="card-title">Schülerübersicht</h2>
-        
+
+        <div class="student-search-container">
+          <svg class="student-search-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="student-search" class="student-search-input" placeholder="Schüler suchen..." autocomplete="off">
+        </div>
+
         <div id="student-list" class="student-list-container">
           <!-- Dynamically populated via JS -->
           <div class="empty-state" id="empty-state">
             <p class="empty-state-text">Keine Schüler vorhanden. Verwende das Formular, um einen Schüler anzulegen.</p>
+          </div>
+          <div class="empty-state" id="search-empty-state" style="display:none;">
+            <p class="empty-state-text">Kein Schüler gefunden.</p>
           </div>
         </div>
       </section>
@@ -65,6 +128,14 @@
           </div>
         </div>
         <button type="button" id="btn-new-foerderplan" class="btn btn-primary">+ Neuen Förderplan</button>
+      </div>
+
+      <!-- Stammdaten Tile -->
+      <div class="subject-tile stammdaten-tile" id="tile-stammdaten">
+        <div class="subject-tile-header" data-subject="stammdaten">Stammdaten</div>
+        <div class="subject-tile-body">
+          <p class="tile-empty-state">Stammdaten werden hier ergänzt.</p>
+        </div>
       </div>
 
       <div class="subject-tiles-grid">
@@ -85,6 +156,28 @@
           <div class="subject-tile-body"></div>
         </div>
       </div>
+
+      <!-- Alte Förderpläne Tile -->
+      <div class="subject-tile stammdaten-tile" id="tile-alte-foerderplaene">
+        <div class="subject-tile-header" data-subject="alte-foerderplaene">Alle Förderpläne (PDF)</div>
+        <div class="subject-tile-body">
+          <p class="tile-empty-state">Vergangene Förderpläne werden hier gesammelt.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= VIEW 1.7: SUBJECT DETAIL VIEW (READ-ONLY) ================= -->
+    <section id="subject-detail-view" class="glass-card subject-detail-view" aria-labelledby="subject-detail-title">
+      <div class="student-dashboard-header">
+        <div class="student-dashboard-title-block">
+          <button type="button" id="btn-back-from-detail" class="btn-back-circle" title="Zurück" aria-label="Zurück">&#8592;</button>
+          <div>
+            <h2 id="subject-detail-title" class="workspace-title">Fach</h2>
+            <div class="workspace-subtitle">Schüler: <strong id="subject-detail-student">Name</strong></div>
+          </div>
+        </div>
+      </div>
+      <div id="subject-detail-content" class="subject-detail-content"></div>
     </section>
 
     <!-- ================= VIEW 2: FULL SCREEN WORKSPACE FOR GOALS ================= -->
@@ -115,30 +208,29 @@
       <!-- STEP 1 PANEL: Goal Selection -->
       <div class="workspace-step-panel active" id="workspace-step-1">
         <h3 class="step-section-title">Förderziele festlegen</h3>
+
+        <!-- Custom Goal input -->
+        <div class="custom-goal-box">
+          <label class="form-label" for="custom-goal-input">Eigenes Förderziel ergänzen</label>
+          <div class="custom-goal-input-row">
+            <input type="text" id="custom-goal-input" class="form-input" placeholder="Zielsatz formulieren..." autocomplete="off">
+            <button type="button" id="btn-add-custom-goal" class="btn-add-circle" title="Hinzufügen" aria-label="Hinzufügen">+</button>
+          </div>
+        </div>
+
         <div id="workspace-goals-checklist-step1" class="goals-checklist-grid">
           <!-- Dynamically populated checkbox list via JS -->
         </div>
 
-        <!-- Custom Goal input -->
-        <div class="form-group" style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
-          <label class="form-label" for="custom-goal-input">Eigenes Förderziel ergänzen</label>
-          <div style="display: flex; gap: 10px; max-width: 600px;">
-            <input type="text" id="custom-goal-input" class="form-input" placeholder="Zielsatz formulieren..." autocomplete="off">
-            <button type="button" id="btn-add-custom-goal" class="btn btn-secondary">Hinzufügen</button>
-          </div>
-        </div>
-
         <!-- Footer buttons for Step 1 -->
         <div class="workspace-footer">
-          <button type="button" id="btn-restart-selection" class="btn btn-secondary">Neustarten</button>
-          <button type="button" id="btn-cancel-workspace-step1" class="btn btn-secondary">Abbrechen</button>
-          <button type="button" id="btn-go-to-step2" class="btn btn-primary">Weiter zur Bewertung</button>
+          <button type="button" id="btn-go-to-step2" class="btn-back-circle btn-circle-primary" title="Weiter zur Bewertung" aria-label="Weiter zur Bewertung">&#8594;</button>
         </div>
       </div>
 
       <!-- STEP 2 PANEL: Goal Rating -->
       <div class="workspace-step-panel" id="workspace-step-2">
-        <p class="step-instruction"><strong>Schritt 2:</strong> Markiere die Förderziele farblich nach Wichtigkeit (Gelb = mittel, Rot = hoch).</p>
+        <h3 class="step-section-title">Förderziele gewichten</h3>
         <div id="workspace-goals-checklist-step2" class="goals-checklist-grid">
           <!-- Dynamically populated rating rows via JS -->
         </div>
@@ -158,22 +250,22 @@
 
         <!-- Footer buttons for Step 2 -->
         <div class="workspace-footer">
-          <button type="button" id="btn-back-to-step1" class="btn btn-secondary">Zurück zur Auswahl</button>
-          <button type="button" id="btn-go-to-step3" class="btn btn-primary">Weiter zu Maßnahmen</button>
+          <button type="button" id="btn-back-to-step1" class="btn-back-circle" title="Zurück zur Auswahl" aria-label="Zurück zur Auswahl">&#8592;</button>
+          <button type="button" id="btn-go-to-step3" class="btn-back-circle btn-circle-primary" title="Weiter zu Maßnahmen" aria-label="Weiter zu Maßnahmen">&#8594;</button>
         </div>
       </div>
 
       <!-- STEP 3 PANEL: Support Measures -->
       <div class="workspace-step-panel" id="workspace-step-3">
-        <p class="step-instruction"><strong>Schritt 3:</strong> Wähle die passenden Fördermaßnahmen für die ausgewählten Ziele aus.</p>
+        <h3 class="step-section-title">Fördermaßnahmen wählen</h3>
         <div id="workspace-goals-checklist-step3" class="goals-checklist-grid">
           <!-- Dynamically populated goals and measures checklist via JS -->
         </div>
 
         <!-- Footer buttons for Step 3 -->
         <div class="workspace-footer">
-          <button type="button" id="btn-back-to-step2" class="btn btn-secondary">Zurück zur Bewertung</button>
-          <button type="button" id="btn-save-workspace" class="btn btn-primary">Speichern</button>
+          <button type="button" id="btn-back-to-step2" class="btn-back-circle" title="Zurück zur Bewertung" aria-label="Zurück zur Bewertung">&#8592;</button>
+          <button type="button" id="btn-save-workspace" class="btn-back-circle btn-circle-primary" title="Speichern" aria-label="Speichern">&#10003;</button>
         </div>
       </div>
     </section>
@@ -212,6 +304,21 @@
 
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+  <!-- PDF Preview Modal -->
+  <div class="modal-overlay" id="pdf-preview-modal" role="dialog" aria-modal="true" aria-labelledby="pdf-preview-title">
+    <div class="pdf-preview-card">
+      <div class="pdf-preview-header">
+        <button id="btn-close-pdf-preview" class="close-btn" aria-label="Vorschau schließen" title="Schließen">&times;</button>
+      </div>
+      <iframe id="pdf-preview-frame" class="pdf-preview-frame" title="PDF Vorschau"></iframe>
+      <button id="btn-export-pdf" class="btn-back-circle btn-circle-primary pdf-export-fab" title="Exportieren" aria-label="Exportieren">&#8595;</button>
+    </div>
+  </div>
+
+  <!-- PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
   <!-- JavaScript App Logic -->
   <script src="./measures.js"></script>

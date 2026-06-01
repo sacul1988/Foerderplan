@@ -360,6 +360,7 @@ const state = {
   students: [],
   selectedStudentId: null,
   selectedSubject: null,
+  mode: null, // 'default' | 'einsehen'
   // Session storage for custom goals added by user
   sessionCustomGoals: {
     allgemein: [],
@@ -383,10 +384,20 @@ const subjectConfig = {
 
 // --- DOM Elements ---
 const DOM = {
+  homeView: document.getElementById('home-view'),
+  homeTileVerwaltung: document.getElementById('home-tile-verwaltung'),
+  homeTileErstellen: document.getElementById('home-tile-erstellen'),
+  homeTileEinsehen: document.getElementById('home-tile-einsehen'),
+  verwaltungView: document.getElementById('verwaltung-view'),
+  verwaltungTileSchueler: document.getElementById('verwaltung-tile-schueler'),
+  btnBackFromVerwaltung: document.getElementById('btn-back-from-verwaltung'),
+  logoHomeBtn: document.getElementById('logo-home-btn'),
   studentForm: document.getElementById('student-form'),
   studentNameInput: document.getElementById('student-name'),
   studentList: document.getElementById('student-list'),
   emptyState: document.getElementById('empty-state'),
+  searchEmptyState: document.getElementById('search-empty-state'),
+  studentSearch: document.getElementById('student-search'),
   dashboardGrid: document.getElementById('dashboard-grid'),
   
   // Subject Selection Modal
@@ -409,14 +420,19 @@ const DOM = {
   customGoalInput: document.getElementById('custom-goal-input'),
   btnAddCustomGoal: document.getElementById('btn-add-custom-goal'),
   btnBackToDashboard: document.getElementById('btn-back-to-dashboard'),
-  btnRestartSelection: document.getElementById('btn-restart-selection'),
-  btnCancelWorkspaceStep1: document.getElementById('btn-cancel-workspace-step1'),
   btnGoToStep2: document.getElementById('btn-go-to-step2'),
   btnBackToStep1: document.getElementById('btn-back-to-step1'),
   btnGoToStep3: document.getElementById('btn-go-to-step3'),
   btnBackToStep2: document.getElementById('btn-back-to-step2'),
   btnSaveWorkspace: document.getElementById('btn-save-workspace'),
   
+  // Subject Detail View
+  subjectDetailView: document.getElementById('subject-detail-view'),
+  subjectDetailTitle: document.getElementById('subject-detail-title'),
+  subjectDetailStudent: document.getElementById('subject-detail-student'),
+  subjectDetailContent: document.getElementById('subject-detail-content'),
+  btnBackFromDetail: document.getElementById('btn-back-from-detail'),
+
   // Student Dashboard View
   studentDashboardView: document.getElementById('student-dashboard-view'),
   studentDashboardName: document.getElementById('student-dashboard-title'),
@@ -464,6 +480,7 @@ const storage = {
             student.plans[sub] = {};
           }
         });
+        if (!student.history) student.history = [];
         return student;
       });
     } catch (e) {
@@ -521,151 +538,36 @@ function renderStudents() {
       .substring(0, 2)
       .toUpperCase();
       
-    // Calculate active plans and list selected goals grouped by subject
-    let planCount = 0;
-    let goalsDetailsHTML = '';
-    
-    if (student.plans) {
-      const subjectKeys = ['allgemein', 'mathe', 'englisch', 'deutsch'];
-      let detailsList = [];
-      
-      subjectKeys.forEach(sub => {
-        const plansObj = student.plans[sub] || {};
-        // Retrieve goals where rating level is > 0
-        const activeGoals = Object.keys(plansObj).filter(g => {
-          const val = plansObj[g];
-          return val && (typeof val === 'object' ? val.level > 0 : val > 0);
-        });
-        
-        if (activeGoals.length > 0) {
-          planCount++;
-          const subName = subjectConfig[sub].name;
-          const countText = activeGoals.length === 1 ? '1 Ziel' : `${activeGoals.length} Ziele`;
-          
-          detailsList.push(`
-            <div class="goals-group" data-subject="${sub}">
-              <div class="goals-group-title">
-                <span class="goals-group-indicator" data-subject="${sub}"></span>
-                <strong>${escapeHTML(subName)} (${countText}):</strong>
-              </div>
-              <ul class="goals-group-list">
-                ${activeGoals.slice(0, 2).map(g => {
-                  const val = plansObj[g];
-                  const level = typeof val === 'object' ? val.level : val;
-                  const measures = (val && typeof val === 'object' && Array.isArray(val.measures)) ? val.measures : [];
-                  
-                  let measuresHTML = '';
-                  if (measures.length > 0) {
-                    let groupedMeasures = [];
-                    let matchedId = null;
-                    if (defaultGoals[sub]) {
-                      const goalObj = defaultGoals[sub].find(item => item.type === 'goal' && item.text === g);
-                      if (goalObj) matchedId = goalObj.id;
-                    }
-                    
-                    if (matchedId && typeof defaultMeasures !== 'undefined' && defaultMeasures[sub] && defaultMeasures[sub][matchedId]) {
-                      const list = defaultMeasures[sub][matchedId];
-                      list.forEach(subGoalObj => {
-                        const activeMeasures = subGoalObj.measures.filter(m => measures.includes(m));
-                        if (activeMeasures.length > 0) {
-                          groupedMeasures.push({
-                            subGoal: subGoalObj.subGoal,
-                            measures: activeMeasures
-                          });
-                        }
-                      });
-                      
-                      // Catch unmatched
-                      const dbMeasures = new Set(list.flatMap(s => s.measures));
-                      const unmatched = measures.filter(m => !dbMeasures.has(m));
-                      if (unmatched.length > 0) {
-                        groupedMeasures.push({
-                          subGoal: "Sonstige Maßnahmen",
-                          measures: unmatched
-                        });
-                      }
-                    } else {
-                      groupedMeasures.push({
-                        subGoal: null,
-                        measures: measures
-                      });
-                    }
-                    
-                    measuresHTML = groupedMeasures.map(group => {
-                      const subHeader = group.subGoal ? `
-                        <div class="dashboard-subgoal-header">
-                          ${escapeHTML(group.subGoal)}
-                        </div>
-                      ` : '';
-                      return `
-                        ${subHeader}
-                        <ul style="list-style: circle; padding-left: 16px; margin-top: 2px; margin-bottom: 4px; font-size: 0.75rem; color: var(--text-muted);">
-                          ${group.measures.map(m => `<li>${escapeHTML(m)}</li>`).join('')}
-                        </ul>
-                      `;
-                    }).join('');
-                  }
-                  
-                  return `
-                    <li style="margin-bottom: 6px;">
-                      <span class="goal-status-dot" data-level="${level}"></span>
-                      <div>
-                        <strong>${escapeHTML(g)}</strong>
-                        ${measuresHTML}
-                      </div>
-                    </li>
-                  `;
-                }).join('')}
-                ${activeGoals.length > 2 ? `<li style="padding-left: 16px; color: var(--text-muted);">... und ${activeGoals.length - 2} weitere</li>` : ''}
-              </ul>
-            </div>
-          `);
-        }
-      });
-      
-      if (detailsList.length > 0) {
-        goalsDetailsHTML = `
-          <div class="student-selected-goals-container">
-            ${detailsList.join('')}
-          </div>
-        `;
-      }
-    }
-    
-    const metaText = planCount === 0 ? '' : planCount === 1 ? '1 aktives Fach' : `${planCount} aktive Fächer`;
 
     studentCard.innerHTML = `
-      <div class="student-info" style="align-items: flex-start; flex-direction: column; width: 100%;">
-        <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
-          <div class="student-avatar">${initials}</div>
-          <div style="flex-grow: 1;">
-            <div class="student-name">Förderpläne: ${escapeHTML(student.name)}</div>
-            <div class="student-meta">${metaText}</div>
-          </div>
-          <div class="student-actions">
-            <button class="action-btn delete-btn" aria-label="Schüler löschen" title="Schüler löschen">
-              Löschen
-            </button>
-          </div>
-        </div>
-        ${goalsDetailsHTML}
+      <div class="student-info">
+        <div class="student-avatar">${initials}</div>
+        <div class="student-name">${escapeHTML(student.name)}</div>
       </div>
     `;
     
-    studentCard.addEventListener('click', (e) => {
-      if (e.target.closest('.delete-btn')) return;
+    studentCard.addEventListener('click', () => {
       openStudentDashboard(student.id);
-    });
-    
-    studentCard.querySelector('.delete-btn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (confirm(`Schüler/in "${student.name}" unwiderruflich löschen?`)) {
-        deleteStudent(student.id);
-      }
     });
     
     DOM.studentList.appendChild(studentCard);
   });
+}
+
+function filterStudents(query) {
+  const q = query.trim().toLowerCase();
+  const cards = DOM.studentList.querySelectorAll('.student-card');
+  let visibleCount = 0;
+
+  cards.forEach(card => {
+    const student = state.students.find(s => s.id === card.dataset.id);
+    const matches = !q || (student && student.name.toLowerCase().includes(q));
+    card.style.display = matches ? '' : 'none';
+    if (matches) visibleCount++;
+  });
+
+  DOM.emptyState.style.display = state.students.length === 0 ? 'flex' : 'none';
+  DOM.searchEmptyState.style.display = (q && visibleCount === 0 && state.students.length > 0) ? 'flex' : 'none';
 }
 
 function addStudent(name) {
@@ -680,7 +582,8 @@ function addStudent(name) {
       mathe: {},
       englisch: {},
       deutsch: {}
-    }
+    },
+    history: []
   };
   
   state.students.push(newStudent);
@@ -1169,11 +1072,23 @@ function saveWorkspaceGoals() {
   });
   
   state.students[studentIndex].plans[subject] = finalPlansObj;
+
+  const historyEntry = saveHistorySnapshot(studentIndex, subject);
   storage.saveData(state.students);
   renderStudents();
-  
-  const subName = subjectConfig[subject].name;
-  showToast(`Förderziele für "${state.students[studentIndex].name}" im Bereich "${subName}" wurden gespeichert.`);
+
+  try {
+    const doc = generateFoerderplan(state.students[studentIndex], historyEntry.date);
+    const safeName = state.students[studentIndex].name.replace(/\s+/g, '_');
+    const safeFach = subjectConfig[subject].name.replace(/\s+/g, '_');
+    const safeDate = historyEntry.date.replace(/\./g, '-');
+    showPDFPreview(doc, `Förderplan_${safeName}_${safeFach}_${safeDate}.pdf`);
+  } catch (e) {
+    console.error('PDF-Fehler:', e);
+    showToast('PDF konnte nicht erstellt werden.', 'error');
+  }
+
+  showToast(`Förderplan für "${state.students[studentIndex].name}" gespeichert.`);
   closeWorkspace();
 }
 
@@ -1190,6 +1105,229 @@ function escapeHTML(str) {
   );
 }
 
+// --- PDF Preview ---
+let pdfPreviewUrl = null;
+let pdfPreviewFilename = null;
+
+function showPDFPreview(doc, filename) {
+  const blob = doc.output('blob');
+  if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+  pdfPreviewUrl = URL.createObjectURL(blob);
+  pdfPreviewFilename = filename;
+  document.getElementById('pdf-preview-frame').src = pdfPreviewUrl;
+  document.getElementById('pdf-preview-modal').classList.add('active');
+}
+
+function closePDFPreview() {
+  document.getElementById('pdf-preview-modal').classList.remove('active');
+  document.getElementById('pdf-preview-frame').src = '';
+  if (pdfPreviewUrl) {
+    URL.revokeObjectURL(pdfPreviewUrl);
+    pdfPreviewUrl = null;
+  }
+  pdfPreviewFilename = null;
+}
+
+// --- PDF Generation & History ---
+function saveHistorySnapshot(studentIndex, subject) {
+  const student = state.students[studentIndex];
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  if (!student.history) student.history = [];
+  const entry = {
+    id: Date.now().toString(),
+    date: dateStr,
+    subject: subject || null,
+    label: `Förderplan ${dateStr}`,
+    plans: JSON.parse(JSON.stringify(student.plans))
+  };
+  student.history.unshift(entry);
+  return entry;
+}
+
+function generateFoerderplan(student, dateStr) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 18;
+  let y = 0;
+
+  // Header bar
+  doc.setFillColor(30, 41, 59);
+  doc.rect(0, 0, pageWidth, 17, 'F');
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text('Lern-Förderplan', pageWidth / 2, 11, { align: 'center' });
+
+  y = 27;
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(student.name, margin, y);
+
+  y += 7;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Erstellt am: ${dateStr}`, margin, y);
+
+  y += 6;
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.4);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 8;
+
+  const subjectColors = {
+    allgemein: [100, 116, 139],
+    mathe:     [79, 70, 229],
+    englisch:  [2, 132, 199],
+    deutsch:   [13, 148, 136]
+  };
+
+  ['allgemein', 'mathe', 'englisch', 'deutsch'].forEach(subject => {
+    const plansObj = student.plans[subject] || {};
+    const activeGoals = Object.keys(plansObj).filter(g => {
+      const val = plansObj[g];
+      return val && (typeof val === 'object' ? val.level > 0 : val > 0);
+    });
+    if (activeGoals.length === 0) return;
+
+    if (y > pageHeight - 35) { doc.addPage(); y = 16; }
+
+    const color = subjectColors[subject];
+    const tableRows = activeGoals.map(goalName => {
+      const val = plansObj[goalName];
+      const level = typeof val === 'object' ? val.level : val;
+      const measures = (val && typeof val === 'object' && Array.isArray(val.measures)) ? val.measures : [];
+      const levelText = level === 3 ? 'Hoch' : 'Mittel';
+      const levelFill = level === 3 ? [254, 226, 226] : [254, 249, 195];
+      const levelColor = level === 3 ? [185, 28, 28] : [161, 98, 7];
+      return [
+        goalName,
+        { content: levelText, styles: { fillColor: levelFill, textColor: levelColor, fontStyle: 'bold', halign: 'center' } },
+        measures.length > 0 ? measures.join('\n') : '–'
+      ];
+    });
+
+    doc.autoTable({
+      startY: y,
+      head: [
+        [{ content: subjectConfig[subject].name, colSpan: 3, styles: { fillColor: color, textColor: [255,255,255], fontStyle: 'bold', fontSize: 10, cellPadding: { top: 5, bottom: 5, left: 5, right: 5 } } }],
+        [
+          { content: 'Förderziel',       styles: { fillColor: [248,250,252], textColor: [71,85,105], fontStyle: 'bold', fontSize: 8.5 } },
+          { content: 'Gewichtung',       styles: { fillColor: [248,250,252], textColor: [71,85,105], fontStyle: 'bold', fontSize: 8.5, halign: 'center' } },
+          { content: 'Fördermaßnahmen', styles: { fillColor: [248,250,252], textColor: [71,85,105], fontStyle: 'bold', fontSize: 8.5 } }
+        ]
+      ],
+      body: tableRows,
+      margin: { left: margin, right: margin },
+      headStyles: {},
+      bodyStyles: { fontSize: 8.5, valign: 'top', cellPadding: 4 },
+      columnStyles: {
+        0: { cellWidth: 62 },
+        1: { cellWidth: 22, halign: 'center' },
+        2: { cellWidth: 'auto' }
+      },
+      styles: { lineColor: [226, 232, 240], lineWidth: 0.3, overflow: 'linebreak' },
+      theme: 'grid'
+    });
+
+    y = doc.lastAutoTable.finalY + 8;
+  });
+
+  // Signature section
+  if (y > pageHeight - 52) { doc.addPage(); y = 16; }
+  y += 6;
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.4);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 10;
+
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text('Unterschriften', margin, y);
+  y += 14;
+
+  const halfW = (pageWidth - margin * 2) / 2 - 5;
+  const col2X = margin + halfW + 10;
+
+  doc.setDrawColor(50, 50, 50);
+  doc.setLineWidth(0.5);
+  doc.line(margin, y + 12, margin + halfW, y + 12);
+  doc.line(col2X, y + 12, col2X + halfW, y + 12);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Sonderpädagoge/in',       margin, y + 18);
+  doc.text('Erziehungsberechtigte/r', col2X,  y + 18);
+  doc.text('Datum: ____________________', margin, y + 27);
+  doc.text('Datum: ____________________', col2X,  y + 27);
+
+  return doc;
+}
+
+// --- Subject Detail View (Read-Only) ---
+function openSubjectDetailView(subject) {
+  const student = state.students.find(s => s.id === state.selectedStudentId);
+  if (!student) return;
+
+  const subName = subjectConfig[subject].name;
+  DOM.subjectDetailTitle.textContent = `${subName}`;
+  DOM.subjectDetailStudent.textContent = student.name;
+
+  renderSubjectDetailContent(student, subject);
+
+  DOM.studentDashboardView.classList.remove('active');
+  DOM.subjectDetailView.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function closeSubjectDetailView() {
+  DOM.subjectDetailView.classList.remove('active');
+  DOM.studentDashboardView.classList.add('active');
+}
+
+function renderSubjectDetailContent(student, subject) {
+  const plansObj = student.plans[subject] || {};
+  const activeGoals = Object.keys(plansObj).filter(g => {
+    const val = plansObj[g];
+    return val && (typeof val === 'object' ? val.level > 0 : val > 0);
+  });
+
+  if (activeGoals.length === 0) {
+    DOM.subjectDetailContent.innerHTML = `<p class="tile-empty-state" style="padding: 40px 0;">Noch keine Förderziele für dieses Fach vorhanden.</p>`;
+    return;
+  }
+
+  DOM.subjectDetailContent.innerHTML = activeGoals.map(goalName => {
+    const val = plansObj[goalName];
+    const level = typeof val === 'object' ? val.level : val;
+    const measures = (val && typeof val === 'object' && Array.isArray(val.measures)) ? val.measures : [];
+    const levelLabel = level === 3 ? 'Hoher Förderbedarf' : 'Mittlerer Förderbedarf';
+
+    const measuresHTML = measures.length > 0
+      ? `<ul class="detail-measures-list">${measures.map(m => `<li>${escapeHTML(m)}</li>`).join('')}</ul>`
+      : `<p class="detail-no-measures">Keine Maßnahmen ausgewählt.</p>`;
+
+    return `
+      <div class="detail-goal-card">
+        <div class="detail-goal-header">
+          <span class="goal-status-dot" data-level="${level}"></span>
+          <div class="detail-goal-info">
+            <span class="detail-goal-name">${escapeHTML(goalName)}</span>
+            <span class="detail-goal-level" data-level="${level}">${levelLabel}</span>
+          </div>
+        </div>
+        ${measuresHTML}
+      </div>
+    `;
+  }).join('');
+}
+
 // --- Student Dashboard ---
 function openStudentDashboard(studentId) {
   const student = state.students.find(s => s.id === studentId);
@@ -1199,6 +1337,8 @@ function openStudentDashboard(studentId) {
   DOM.studentDashboardName.textContent = `Förderpläne: ${student.name}`;
   renderStudentDashboardTiles(student);
 
+  DOM.btnNewFoerderplan.style.display = state.mode === 'einsehen' ? 'none' : '';
+
   DOM.dashboardGrid.classList.add('hidden');
   DOM.studentDashboardView.classList.add('active');
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1207,10 +1347,90 @@ function openStudentDashboard(studentId) {
 function closeStudentDashboard() {
   DOM.studentDashboardView.classList.remove('active');
   DOM.dashboardGrid.classList.remove('hidden');
+  DOM.studentSearch.value = '';
+  filterStudents('');
   state.selectedStudentId = null;
 }
 
+function getSchoolYear(dateStr) {
+  const parts = dateStr.split('.');
+  const month = parseInt(parts[1], 10);
+  const year = parseInt(parts[2], 10);
+  return month >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+}
+
 function renderStudentDashboardTiles(student) {
+  // Render "Alte Förderpläne" tile
+  const historyBody = document.querySelector('#tile-alte-foerderplaene .subject-tile-body');
+  const history = student.history || [];
+
+  // Group entries by school year
+  const grouped = {};
+  history.forEach(entry => {
+    const sy = getSchoolYear(entry.date);
+    if (!grouped[sy]) grouped[sy] = [];
+    grouped[sy].push(entry);
+  });
+
+  // Always include current school year
+  const now = new Date();
+  const curMonth = now.getMonth() + 1;
+  const curYear = now.getFullYear();
+  const currentSY = curMonth >= 8 ? `${curYear}/${curYear + 1}` : `${curYear - 1}/${curYear}`;
+  if (!grouped[currentSY]) grouped[currentSY] = [];
+
+  // Sort newest first
+  const sortedYears = Object.keys(grouped).sort((a, b) => parseInt(b) - parseInt(a));
+
+  historyBody.innerHTML = sortedYears.map(sy => {
+    const entries = grouped[sy];
+    const entriesHTML = entries.length === 0
+      ? `<p class="tile-empty-state" style="padding: 10px 0 6px;">Keine Förderpläne für dieses Schuljahr.</p>`
+      : entries.map(entry => {
+          const safeName = student.name.replace(/\s+/g, '_');
+          const safeFach = entry.subject ? subjectConfig[entry.subject].name.replace(/\s+/g, '_') : 'Alle';
+          const safeDate = entry.date.replace(/\./g, '-');
+          const filename = `Förderplan_${safeName}_${safeFach}_${safeDate}.pdf`;
+          return `
+            <div class="history-entry history-entry-clickable" data-entry-id="${escapeHTML(entry.id)}" data-filename="${escapeHTML(filename)}">
+              <span class="history-entry-label">${escapeHTML(filename)}</span>
+            </div>
+          `;
+        }).join('');
+
+    return `
+      <div class="history-year-tile" data-sy="${escapeHTML(sy)}">
+        <div class="history-year-header">
+          <span class="history-year-label">Schuljahr ${escapeHTML(sy)}</span>
+          <span class="history-year-chevron">&#8250;</span>
+        </div>
+        <div class="history-year-content">${entriesHTML}</div>
+      </div>
+    `;
+  }).join('');
+
+  historyBody.querySelectorAll('.history-year-header').forEach(header => {
+    header.addEventListener('click', (e) => {
+      e.stopPropagation();
+      header.closest('.history-year-tile').classList.toggle('open');
+    });
+  });
+
+  historyBody.querySelectorAll('.history-entry-clickable').forEach(row => {
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const entry = history.find(h => h.id === row.dataset.entryId);
+      if (!entry) return;
+      try {
+        const tempStudent = { name: student.name, plans: entry.plans };
+        const doc = generateFoerderplan(tempStudent, entry.date);
+        showPDFPreview(doc, row.dataset.filename);
+      } catch (err) {
+        showToast('PDF konnte nicht erstellt werden.', 'error');
+      }
+    });
+  });
+
   ['allgemein', 'mathe', 'englisch', 'deutsch'].forEach(subject => {
     const tileBody = document.querySelector(`#tile-${subject} .subject-tile-body`);
     const plansObj = student.plans[subject] || {};
@@ -1249,6 +1469,26 @@ function renderStudentDashboardTiles(student) {
 
 // --- Event Listeners ---
 function setupEventListeners() {
+  // Home tiles
+  DOM.homeTileVerwaltung.addEventListener('click', navigateToVerwaltung);
+  DOM.homeTileErstellen.addEventListener('click', navigateToApp);
+  DOM.homeTileEinsehen.addEventListener('click', navigateToEinsehen);
+
+  // Verwaltung sub-tiles
+  DOM.verwaltungTileSchueler.addEventListener('click', navigateToSchuelerVerwalten);
+  DOM.btnBackFromVerwaltung.addEventListener('click', showHomeView);
+
+  // Student search live filter
+  DOM.studentSearch.addEventListener('input', () => {
+    filterStudents(DOM.studentSearch.value);
+  });
+
+  // Logo → back to home
+  DOM.logoHomeBtn.addEventListener('click', showHomeView);
+  DOM.logoHomeBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') showHomeView();
+  });
+
   // Add Student
   DOM.studentForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1260,6 +1500,16 @@ function setupEventListeners() {
       showToast('Bitte gib einen gültigen Namen ein.', 'error');
     }
   });
+
+  // Subject tile clicks → Detail View
+  document.querySelectorAll('.subject-tiles-grid .subject-tile').forEach(tile => {
+    tile.addEventListener('click', () => {
+      const subject = tile.id.replace('tile-', '');
+      openSubjectDetailView(subject);
+    });
+  });
+
+  DOM.btnBackFromDetail.addEventListener('click', closeSubjectDetailView);
 
   // Student Dashboard navigation
   DOM.btnBackFromStudentDashboard.addEventListener('click', closeStudentDashboard);
@@ -1286,17 +1536,6 @@ function setupEventListeners() {
 
   // Workspace Actions
   DOM.btnBackToDashboard.addEventListener('click', () => closeWorkspace(true));
-  DOM.btnCancelWorkspaceStep1.addEventListener('click', closeWorkspace);
-  
-  // Restart Selection
-  DOM.btnRestartSelection.addEventListener('click', () => {
-    state.selectedGoals = [];
-    checkGoalsCountLimit();
-    const student = state.students.find(s => s.id === state.selectedStudentId);
-    renderStep1(student, state.selectedSubject);
-    showToast('Auswahl wurde zurückgesetzt.');
-  });
-  
   // Go to Step 2
   DOM.btnGoToStep2.addEventListener('click', () => {
     if (state.selectedGoals.length === 0) {
@@ -1357,6 +1596,20 @@ function setupEventListeners() {
   // Save Goals
   DOM.btnSaveWorkspace.addEventListener('click', saveWorkspaceGoals);
 
+  // PDF Preview Modal
+  document.getElementById('btn-export-pdf').addEventListener('click', () => {
+    if (pdfPreviewFilename && pdfPreviewUrl) {
+      const a = document.createElement('a');
+      a.href = pdfPreviewUrl;
+      a.download = pdfPreviewFilename;
+      a.click();
+    }
+  });
+  document.getElementById('btn-close-pdf-preview').addEventListener('click', closePDFPreview);
+  document.getElementById('pdf-preview-modal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('pdf-preview-modal')) closePDFPreview();
+  });
+
   // Escape key support
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -1365,6 +1618,49 @@ function setupEventListeners() {
       }
     }
   });
+}
+
+// --- Home Navigation ---
+function showHomeView() {
+  DOM.homeView.classList.add('active');
+  DOM.verwaltungView.classList.remove('active');
+  DOM.dashboardGrid.classList.add('hidden');
+  DOM.dashboardGrid.classList.remove('einsehen-mode');
+  DOM.studentDashboardView.classList.remove('active');
+  DOM.subjectDetailView.classList.remove('active');
+  DOM.goalsWorkspaceView.classList.remove('active');
+  DOM.subjectModal.classList.remove('active');
+  state.selectedStudentId = null;
+  state.selectedSubject = null;
+  state.selectedGoals = [];
+  state.editingPlans = {};
+  state.mode = null;
+}
+
+function navigateToApp() {
+  state.mode = 'default';
+  DOM.homeView.classList.remove('active');
+  DOM.dashboardGrid.classList.remove('einsehen-mode');
+  DOM.dashboardGrid.classList.remove('hidden');
+}
+
+function navigateToVerwaltung() {
+  state.mode = 'verwaltung';
+  DOM.homeView.classList.remove('active');
+  DOM.verwaltungView.classList.add('active');
+}
+
+function navigateToSchuelerVerwalten() {
+  DOM.verwaltungView.classList.remove('active');
+  DOM.dashboardGrid.classList.add('einsehen-mode');
+  DOM.dashboardGrid.classList.remove('hidden');
+}
+
+function navigateToEinsehen() {
+  state.mode = 'einsehen';
+  DOM.homeView.classList.remove('active');
+  DOM.dashboardGrid.classList.add('einsehen-mode');
+  DOM.dashboardGrid.classList.remove('hidden');
 }
 
 // --- Init ---
