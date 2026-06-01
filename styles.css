@@ -1,5 +1,14 @@
 /* Design System & Styling für Förderplan Kernfunktion (Professional Edition) */
 
+html {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar {
+  display: none;
+}
+
 /* --- Google Fonts --- */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -64,6 +73,12 @@ body {
   line-height: 1.5;
   transition: background-color var(--transition-normal), color var(--transition-normal);
   -webkit-font-smoothing: antialiased;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+body::-webkit-scrollbar {
+  display: none;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -2032,6 +2047,17 @@ h1, h2, h3, h4, h5, h6 {
   gap: 28px;
 }
 
+#zeitraum-view,
+#schueler-anlegen-view {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+#zeitraum-view::-webkit-scrollbar,
+#schueler-anlegen-view::-webkit-scrollbar {
+  display: none;
+}
+
 .schueler-anlegen-card {
   flex-grow: 1;
   gap: 20px;
@@ -2128,13 +2154,57 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .verwaltung-tiles-grid {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
 }
 
-@media (max-width: 900px) {
-  .verwaltung-tiles-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+#verwaltung-tile-schueler {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+#verwaltung-tile-schueler:hover {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+#verwaltung-tile-zeitraum {
+  background-color: #7c3aed;
+  border-color: #7c3aed;
+}
+#verwaltung-tile-zeitraum:hover {
+  background-color: #6d28d9;
+  border-color: #6d28d9;
+}
+
+#verwaltung-tile-uebersicht {
+  background-color: #0d9488;
+  border-color: #0d9488;
+}
+#verwaltung-tile-uebersicht:hover {
+  background-color: #0f766e;
+  border-color: #0f766e;
+}
+
+#verwaltung-tile-archiv {
+  background-color: #ea580c;
+  border-color: #ea580c;
+}
+#verwaltung-tile-archiv:hover {
+  background-color: #c2410c;
+  border-color: #c2410c;
+}
+
+#verwaltung-tile-schueler .home-tile-title,
+#verwaltung-tile-zeitraum .home-tile-title,
+#verwaltung-tile-uebersicht .home-tile-title,
+#verwaltung-tile-archiv .home-tile-title {
+  color: white;
+}
+
+#verwaltung-tile-schueler .home-tile-desc,
+#verwaltung-tile-zeitraum .home-tile-desc,
+#verwaltung-tile-uebersicht .home-tile-desc,
+#verwaltung-tile-archiv .home-tile-desc {
+  color: rgba(255, 255, 255, 0.8);
 }
 
 /* --- Home Fristen-Kachel --- */

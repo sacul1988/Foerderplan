@@ -1567,6 +1567,7 @@ function navigateToSchuelerAnlegen() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  setGearButtonVisible(true);
   DOM.schuelerVerwaltungView.classList.remove('active');
   DOM.schuelerAnlegenView.classList.add('active');
 }
@@ -1668,6 +1669,7 @@ function navigateToUebersicht() {
   renderUebersicht();
   DOM.verwaltungView.classList.remove('active');
   DOM.uebersichtView.classList.add('active');
+  setGearButtonVisible(true);
 }
 
 function renderUebersicht() {
@@ -1751,6 +1753,7 @@ function navigateToArchiv() {
   renderArchiv();
   DOM.verwaltungView.classList.remove('active');
   DOM.archivView.classList.add('active');
+  setGearButtonVisible(true);
 }
 
 function renderArchiv() {
@@ -1829,6 +1832,7 @@ function openSchuelerDetailVerwaltung(studentId) {
   renderStammdatenInTile(student, document.getElementById('tile-stammdaten-verwaltung-body'));
   DOM.dashboardGrid.classList.add('hidden');
   DOM.schuelerDetailVerwaltungView.classList.add('active');
+  setGearButtonVisible(true);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -2008,10 +2012,10 @@ function renderStudentDashboardTiles(student) {
 function setupEventListeners() {
   // Home tiles
   DOM.homeTileVerwaltung.addEventListener('click', () => {
-    if (DOM.verwaltungView.classList.contains('active')) {
-      showHomeView();
-    } else {
+    if (DOM.homeView.classList.contains('active')) {
       navigateToVerwaltung();
+    } else {
+      showHomeView();
     }
   });
   DOM.homeTileErstellen.addEventListener('click', () => {
@@ -2434,6 +2438,7 @@ function setHeader(text) {
 function navigateToSchuelerVerwaltung() {
   DOM.verwaltungView.classList.remove('active');
   DOM.schuelerVerwaltungView.classList.add('active');
+  setGearButtonVisible(true);
 }
 
 function navigateToZeitraum() {
@@ -2448,6 +2453,7 @@ function navigateToZeitraum() {
   renderZeitraumStatus();
   DOM.verwaltungView.classList.remove('active');
   DOM.zeitraumView.classList.add('active');
+  setGearButtonVisible(true);
 }
 
 function navigateBackFromZeitraum() {
@@ -2508,7 +2514,7 @@ function navigateToSchuelerVerwalten() {
   DOM.schuelerVerwaltungView.classList.remove('active');
   DOM.dashboardGrid.classList.add('einsehen-mode');
   DOM.dashboardGrid.classList.remove('hidden');
-  setGearButtonVisible(false);
+  setGearButtonVisible(state.mode === 'verwaltung');
 }
 
 function navigateToEinsehen() {
