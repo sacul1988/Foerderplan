@@ -411,6 +411,7 @@ const DOM = {
   btnBackFromList: document.getElementById('btn-back-from-list'),
   zeitraumView: document.getElementById('zeitraum-view'),
   btnBackFromZeitraum: document.getElementById('btn-back-from-zeitraum'),
+  zeitraumSjName: document.getElementById('schuljahr-name'),
   zeitraumSjVon: document.getElementById('schuljahr-von'),
   zeitraumSjBis: document.getElementById('schuljahr-bis'),
   zeitraumFpVon: document.getElementById('foerderplan-von'),
@@ -1890,7 +1891,7 @@ function setupEventListeners() {
   DOM.btnBackFromZeitraum.addEventListener('click', navigateBackFromZeitraum);
   DOM.btnSaveZeitraum.addEventListener('click', () => {
     const data = {
-      schuljahr:        { von: DOM.zeitraumSjVon.value || null, bis: DOM.zeitraumSjBis.value || null },
+      schuljahr:        { name: DOM.zeitraumSjName.value.trim() || null, von: DOM.zeitraumSjVon.value || null, bis: DOM.zeitraumSjBis.value || null },
       foerderplan:      { von: DOM.zeitraumFpVon.value || null, bis: DOM.zeitraumFpBis.value || null },
       elterngespraeche: { von: DOM.zeitraumEgVon.value || null, bis: DOM.zeitraumEgBis.value || null }
     };
@@ -2154,8 +2155,9 @@ function renderFristenTile() {
     </div>`;
   }
 
+  const sjLabel = zeitraum.schuljahr?.name ? `Schuljahr ${zeitraum.schuljahr.name}` : 'Schuljahr';
   body.innerHTML =
-    col('Schuljahr', zeitraum.schuljahr, false) +
+    col(sjLabel, zeitraum.schuljahr, false) +
     col('Förderpläne schreiben', zeitraum.foerderplan, true) +
     col('Förderplangespräche', zeitraum.elterngespraeche, false);
 }
@@ -2174,6 +2176,7 @@ function navigateToSchuelerVerwaltung() {
 
 function navigateToZeitraum() {
   const zeitraum = loadZeitraum();
+  DOM.zeitraumSjName.value = zeitraum.schuljahr?.name || '';
   fpSjVon.setDate(zeitraum.schuljahr?.von || null);
   fpSjBis.setDate(zeitraum.schuljahr?.bis || null);
   fpFpVon.setDate(zeitraum.foerderplan?.von || null);

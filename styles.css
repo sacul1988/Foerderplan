@@ -2218,6 +2218,11 @@ h1, h2, h3, h4, h5, h6 {
 .home-uebersicht-entry-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .home-uebersicht-name {
@@ -2225,15 +2230,13 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .home-uebersicht-missing {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 5px;
+  margin-left: auto;
 }
 
 .missing-subject-tag {
@@ -2244,10 +2247,13 @@ h1, h2, h3, h4, h5, h6 {
   color: white;
 }
 
-.missing-subject-tag[data-subject="allgemein"] { background-color: var(--color-allgemein); }
-.missing-subject-tag[data-subject="mathe"]     { background-color: var(--color-mathe); }
-.missing-subject-tag[data-subject="englisch"]  { background-color: var(--color-englisch); }
-.missing-subject-tag[data-subject="deutsch"]   { background-color: var(--color-deutsch); }
+.missing-subject-tag[data-subject="allgemein"],
+.missing-subject-tag[data-subject="mathe"],
+.missing-subject-tag[data-subject="englisch"],
+.missing-subject-tag[data-subject="deutsch"] {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
 
 .home-uebersicht-all-done {
   grid-column: 1 / -1;
