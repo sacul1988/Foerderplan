@@ -3100,6 +3100,18 @@ let datePickersReady = false;
 // Einmalige Einrichtung; wartet auf den Auth-Status.
 function init() {
   db = firebase.firestore();
+  // Offline-Persistenz: Schreibvorgänge werden in IndexedDB zwischengespeichert und
+  // automatisch synchronisiert, sobald wieder eine Verbindung besteht – auch nach
+  // einem Tab-Neustart. Muss vor dem ersten Firestore-Zugriff aufgerufen werden.
+  db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Offline-Persistenz nur in einem Tab gleichzeitig aktiv.');
+    } else if (err.code === 'unimplemented') {
+      console.warn('Offline-Persistenz wird von diesem Browser nicht unterstützt.');
+    } else {
+      console.warn('Offline-Persistenz konnte nicht aktiviert werden:', err);
+    }
+  });
   setupEventListeners();
   setupAuthListeners();
   setupConnectivityWatch();
