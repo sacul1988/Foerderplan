@@ -31,7 +31,7 @@ html::-webkit-scrollbar {
   --accent-primary: #2563eb;   /* Blue 600 */
   --accent-primary-hover: #1d4ed8; /* Blue 700 */
   --accent-primary-light: #eff6ff; /* Blue 50 */
-  --accent-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
+  --accent-gradient: #2563eb;
 
   --border-color: #e2e8f0;     /* Slate 200 */
   --border-color-focus: #2563eb;
@@ -96,9 +96,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* --- Layout Structure --- */
-/* Blaue Kopfleiste – überall */
+/* Dunkelgraue Kopfleiste – überall */
 .app-header {
-  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  background: #334155;
   border-bottom: 1px solid transparent;
   padding: 16px max(40px, calc((100% - 1440px) / 2 + 40px));
   display: flex;
@@ -118,7 +118,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .logo-badge {
-  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  background: #2563eb;
   width: 34px;
   height: 34px;
   border-radius: var(--radius-sm);
@@ -264,6 +264,17 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
   outline: none;
   transition: all var(--transition-fast);
+}
+
+.required-mark {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.form-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .form-input:focus {
@@ -1193,6 +1204,41 @@ h1, h2, h3, h4, h5, h6 {
 .goal-status-dot[data-level="3"] { background-color: #ef4444; }
 .goal-status-dot[data-level="2"] { background-color: #eab308; }
 
+/* --- Speicher-Status (im Header) --- */
+.save-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 99px;
+  white-space: nowrap;
+  align-self: center;
+}
+.save-status.is-saving {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
+}
+.save-status.is-saved {
+  color: #ffffff;
+  background: rgba(34, 197, 94, 0.9);
+}
+.save-status.is-error {
+  color: #ffffff;
+  background: rgba(220, 38, 38, 0.95);
+}
+
+/* --- Offline-Hinweis --- */
+.offline-banner {
+  position: sticky;
+  top: 71px;
+  z-index: 99;
+  background: #b45309;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
+  padding: 8px 16px;
+}
+
 /* --- Toast Notification --- */
 .toast-container {
   position: fixed;
@@ -1362,7 +1408,7 @@ h1, h2, h3, h4, h5, h6 {
   height: 38px;
   border-radius: 50%;
   border: 1px solid transparent;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background: #334155;
   color: #ffffff;
   font-size: 1.1rem;
   cursor: pointer;
@@ -1442,6 +1488,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .subject-tile-header[data-subject="stammdaten"]        { background-color: #334155; }
 .subject-tile-header[data-subject="alte-foerderplaene"] { background-color: #475569; }
+.subject-tile-header[data-subject="foerderplaene"]     { background-color: #475569; }
 .subject-tile-header[data-subject="allgemein"]  { background-color: var(--color-allgemein); }
 .subject-tile-header[data-subject="mathe"]      { background-color: var(--color-mathe); }
 .subject-tile-header[data-subject="englisch"]   { background-color: var(--color-englisch); }
@@ -1717,20 +1764,20 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 #home-tile-erstellen {
-  background: linear-gradient(140deg, #3b82f6, #1d4ed8);
+  background: #2563eb;
   border-color: #1d4ed8;
 }
 #home-tile-erstellen:hover {
-  background: linear-gradient(140deg, #2f74ea, #1e40af);
+  background: #1d4ed8;
   border-color: #1e40af;
 }
 
 #home-tile-einsehen {
-  background: linear-gradient(140deg, #8b5cf6, #6d28d9);
+  background: #7c3aed;
   border-color: #6d28d9;
 }
 #home-tile-einsehen:hover {
-  background: linear-gradient(140deg, #7c4ef0, #5b21b6);
+  background: #6d28d9;
   border-color: #5b21b6;
 }
 
@@ -1752,7 +1799,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 #home-tile-gespraeche {
-  background: linear-gradient(140deg, #94a3b8, #64748b);
+  background: #64748b;
   border-color: #64748b;
   opacity: 0.85;
   cursor: not-allowed;
@@ -2346,47 +2393,47 @@ h1, h2, h3, h4, h5, h6 {
 
 
 #verwaltung-tile-schueler {
-  background: linear-gradient(140deg, #3b82f6, #1d4ed8);
+  background: #2563eb;
   border-color: #1d4ed8;
 }
 #verwaltung-tile-schueler:hover {
-  background: linear-gradient(140deg, #2f74ea, #1e40af);
+  background: #1d4ed8;
   border-color: #1e40af;
 }
 
 #verwaltung-tile-zeitraum {
-  background: linear-gradient(140deg, #8b5cf6, #6d28d9);
+  background: #7c3aed;
   border-color: #6d28d9;
 }
 #verwaltung-tile-zeitraum:hover {
-  background: linear-gradient(140deg, #7c4ef0, #5b21b6);
+  background: #6d28d9;
   border-color: #5b21b6;
 }
 
 #verwaltung-tile-uebersicht {
-  background: linear-gradient(140deg, #14b8a6, #0f766e);
+  background: #0d9488;
   border-color: #0f766e;
 }
 #verwaltung-tile-uebersicht:hover {
-  background: linear-gradient(140deg, #10a396, #115e59);
+  background: #0f766e;
   border-color: #115e59;
 }
 
 #verwaltung-tile-archiv {
-  background: linear-gradient(140deg, #f59e0b, #b45309);
+  background: #d97706;
   border-color: #b45309;
 }
 #verwaltung-tile-archiv:hover {
-  background: linear-gradient(140deg, #e08c07, #92400e);
+  background: #b45309;
   border-color: #92400e;
 }
 
 #verwaltung-tile-lehrer {
-  background: linear-gradient(140deg, #ec4899, #be185d);
+  background: #db2777;
   border-color: #be185d;
 }
 #verwaltung-tile-lehrer:hover {
-  background: linear-gradient(140deg, #e23a8c, #9d174d);
+  background: #be185d;
   border-color: #9d174d;
 }
 
@@ -2394,7 +2441,8 @@ h1, h2, h3, h4, h5, h6 {
 #verwaltung-tile-zeitraum .home-tile-title,
 #verwaltung-tile-uebersicht .home-tile-title,
 #verwaltung-tile-archiv .home-tile-title,
-#verwaltung-tile-lehrer .home-tile-title {
+#verwaltung-tile-lehrer .home-tile-title,
+#verwaltung-tile-export .home-tile-title {
   color: white;
 }
 
@@ -2402,26 +2450,27 @@ h1, h2, h3, h4, h5, h6 {
 #verwaltung-tile-zeitraum .home-tile-desc,
 #verwaltung-tile-uebersicht .home-tile-desc,
 #verwaltung-tile-archiv .home-tile-desc,
-#verwaltung-tile-lehrer .home-tile-desc {
+#verwaltung-tile-lehrer .home-tile-desc,
+#verwaltung-tile-export .home-tile-desc {
   color: rgba(255, 255, 255, 0.8);
 }
 
 /* --- Schüler-Verwaltung: farbige Kacheln --- */
 #schueler-tile-anlegen {
-  background: linear-gradient(140deg, #10b981, #047857);
+  background: #059669;
   border-color: #047857;
 }
 #schueler-tile-anlegen:hover {
-  background: linear-gradient(140deg, #0ca678, #036949);
+  background: #047857;
   border-color: #036949;
 }
 
 #schueler-tile-verwalten {
-  background: linear-gradient(140deg, #3b82f6, #1d4ed8);
+  background: #2563eb;
   border-color: #1d4ed8;
 }
 #schueler-tile-verwalten:hover {
-  background: linear-gradient(140deg, #2f74ea, #1e40af);
+  background: #1d4ed8;
   border-color: #1e40af;
 }
 
@@ -2460,7 +2509,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .home-fristen-header {
-  background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
+  background: #1d4ed8;
   padding: 16px 22px;
 }
 
@@ -2559,7 +2608,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .home-uebersicht-header {
-  background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
+  background: #1d4ed8;
   padding: 16px 22px;
   display: flex;
   align-items: center;
@@ -3157,4 +3206,48 @@ button:focus-visible,
   color: var(--text-muted);
   font-size: 0.9rem;
   padding: 8px 4px;
+}
+
+/* ============================================================
+   Einheitliches Dunkelgrau für ALLE Kacheln & Header
+   (überschreibt die bisherigen unterschiedlichen Farben)
+   ============================================================ */
+#home-tile-erstellen,
+#home-tile-einsehen,
+#home-tile-gespraeche,
+#verwaltung-tile-schueler,
+#verwaltung-tile-zeitraum,
+#verwaltung-tile-uebersicht,
+#verwaltung-tile-archiv,
+#verwaltung-tile-lehrer,
+#verwaltung-tile-export,
+#schueler-tile-anlegen,
+#schueler-tile-verwalten {
+  background: #334155;
+  border-color: #1e293b;
+}
+
+#home-tile-erstellen:hover,
+#home-tile-einsehen:hover,
+#verwaltung-tile-schueler:hover,
+#verwaltung-tile-zeitraum:hover,
+#verwaltung-tile-uebersicht:hover,
+#verwaltung-tile-archiv:hover,
+#verwaltung-tile-lehrer:hover,
+#verwaltung-tile-export:hover,
+#schueler-tile-anlegen:hover,
+#schueler-tile-verwalten:hover {
+  background: #1e293b;
+  border-color: #0f172a;
+}
+
+/* Abschnitts-Header (Fristen & Zeiträume, Offene Förderpläne) */
+.home-fristen-header,
+.home-uebersicht-header {
+  background: #334155;
+}
+
+/* Kachel-Kopfleisten (Stammdaten, Förderpläne, Fächer) */
+.subject-tile-header[data-subject] {
+  background-color: #334155;
 }

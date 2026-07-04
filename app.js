@@ -401,6 +401,7 @@ const DOM = {
   verwaltungTileZeitraum: document.getElementById('verwaltung-tile-zeitraum'),
   verwaltungTileUebersicht: document.getElementById('verwaltung-tile-uebersicht'),
   verwaltungTileArchiv: document.getElementById('verwaltung-tile-archiv'),
+  verwaltungTileExport: document.getElementById('verwaltung-tile-export'),
   uebersichtView: document.getElementById('uebersicht-view'),
   btnBackFromUebersicht: document.getElementById('btn-back-from-uebersicht'),
   archivView: document.getElementById('archiv-view'),
@@ -478,6 +479,9 @@ const DOM = {
   studentDashboardName: document.getElementById('student-dashboard-title'),
   btnBackFromStudentDashboard: document.getElementById('btn-back-from-student-dashboard'),
   btnNewFoerderplan: document.getElementById('btn-new-foerderplan'),
+  // Speicher-Status & Offline
+  saveStatus: document.getElementById('save-status'),
+  offlineBanner: document.getElementById('offline-banner'),
   // Toast Container
   toastContainer: document.getElementById('toast-container')
 };
@@ -531,6 +535,38 @@ function normalizeStudent(student) {
   return student;
 }
 
+// Zeigt den Speicher-Status oben im Header an ('saving' | 'saved' | 'error').
+function setSaveStatus(status) {
+  const el = DOM.saveStatus;
+  if (!el) return;
+  clearTimeout(el._hideTimer);
+  el.classList.remove('is-saving', 'is-saved', 'is-error');
+  el.style.display = '';
+  if (status === 'saving') {
+    el.textContent = 'Speichern …';
+    el.classList.add('is-saving');
+  } else if (status === 'saved') {
+    el.textContent = 'Gespeichert ✓';
+    el.classList.add('is-saved');
+    el._hideTimer = setTimeout(() => { el.style.display = 'none'; }, 2500);
+  } else if (status === 'error') {
+    el.textContent = 'Nicht gespeichert';
+    el.classList.add('is-error');
+  }
+}
+
+// Verfolgt einen Firestore-Schreibvorgang und aktualisiert den Speicher-Status.
+function trackSave(promise) {
+  setSaveStatus('saving');
+  return promise
+    .then(() => { setSaveStatus('saved'); })
+    .catch(e => {
+      console.error('Fehler beim Speichern:', e);
+      setSaveStatus('error');
+      showToast('Änderung konnte nicht gespeichert werden.', 'error');
+    });
+}
+
 const storage = {
   // Lädt alle Schüler der aktuellen Schule aus Firestore.
   async loadData() {
@@ -545,17 +581,11 @@ const storage = {
   },
   // Speichert (Upsert) einen einzelnen Schüler.
   saveStudent(student) {
-    return studentsCollection().doc(student.id).set(student).catch(e => {
-      console.error('Fehler beim Speichern:', e);
-      showToast('Fehler beim Speichern.', 'error');
-    });
+    return trackSave(studentsCollection().doc(student.id).set(student));
   },
   // Löscht einen Schüler endgültig.
   deleteStudent(id) {
-    return studentsCollection().doc(id).delete().catch(e => {
-      console.error('Fehler beim Löschen:', e);
-      showToast('Fehler beim Löschen.', 'error');
-    });
+    return trackSave(studentsCollection().doc(id).delete());
   },
   // Kompatibilitäts-Wrapper: schreibt alle übergebenen Schüler (Batch-Upsert).
   saveData(data) {
@@ -563,13 +593,11 @@ const storage = {
       const col = studentsCollection();
       const batch = db.batch();
       data.forEach(s => batch.set(col.doc(s.id), s));
-      return batch.commit().catch(e => {
-        console.error('Fehler beim Speichern:', e);
-        showToast('Fehler beim Speichern.', 'error');
-      });
+      return trackSave(batch.commit());
     } catch (e) {
       console.error('Fehler beim Speichern:', e);
-      showToast('Fehler beim Speichern.', 'error');
+      setSaveStatus('error');
+      showToast('Änderung konnte nicht gespeichert werden.', 'error');
     }
   },
 };
@@ -1209,7 +1237,7 @@ function saveWorkspaceGoals() {
   renderStudents();
 
   try {
-    const doc = generateFoerderplan(state.students[studentIndex], historyEntry.date);
+    const doc = generateFoerderplan(state.students[studentIndex], historyEntry.date, historyEntry.erstelltVon);
     const safeName = state.students[studentIndex].name.replace(/\s+/g, '_');
     const safeFach = subjectConfig[subject].name.replace(/\s+/g, '_');
     const safeDate = historyEntry.date.replace(/\./g, '-');
@@ -1234,6 +1262,11 @@ function escapeHTML(str) {
       '"': '&quot;'
     }[tag] || tag)
   );
+}
+
+// Einfache E-Mail-Formatprüfung (nicht-leer, ein @, ein Punkt danach).
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 // --- PDF Preview ---
@@ -1272,6 +1305,7 @@ function saveHistorySnapshot(studentIndex, subject) {
     date: dateStr,
     subject: subject || null,
     label: `Förderplan ${dateStr}`,
+    erstelltVon: (state.currentUser && state.currentUser.name) || '',
     plans: JSON.parse(JSON.stringify(student.plans)),
     stammdaten: JSON.parse(JSON.stringify(student.stammdaten || {}))
   };
@@ -1279,7 +1313,7 @@ function saveHistorySnapshot(studentIndex, subject) {
   return entry;
 }
 
-function generateFoerderplan(student, dateStr) {
+function generateFoerderplan(student, dateStr, erstelltVon = '') {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -1295,6 +1329,12 @@ function generateFoerderplan(student, dateStr) {
   doc.setTextColor(255, 255, 255);
   doc.text('Lern-Förderplan', pageWidth / 2, 11, { align: 'center' });
 
+  if (state.schoolName) {
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(state.schoolName, pageWidth - margin, 11, { align: 'right' });
+  }
+
   y = 27;
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
@@ -1306,6 +1346,11 @@ function generateFoerderplan(student, dateStr) {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
   doc.text(`Erstellt am: ${dateStr}`, margin, y);
+
+  if (erstelltVon) {
+    y += 5;
+    doc.text(`Erstellt von: ${erstelltVon}`, margin, y);
+  }
 
   y += 6;
   doc.setDrawColor(226, 232, 240);
@@ -1471,6 +1516,19 @@ function generateFoerderplan(student, dateStr) {
   doc.text('Datum: ____________________', margin, y + 27);
   doc.text('Datum: ____________________', col2X,  y + 27);
 
+  // Fußzeile mit Seitenzahlen (und Schulname) auf jeder Seite.
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(148, 163, 184);
+    if (state.schoolName) {
+      doc.text(state.schoolName, margin, pageHeight - 8);
+    }
+    doc.text(`Seite ${i} von ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
+  }
+
   return doc;
 }
 
@@ -1506,7 +1564,16 @@ function renderSubjectDetailContent(student, subject) {
     return;
   }
 
-  DOM.subjectDetailContent.innerHTML = activeGoals.map(goalName => {
+  DOM.subjectDetailContent.innerHTML = buildGoalCardsHTML(plansObj);
+}
+
+// Baut die (schreibgeschützte) Förderziel-Karten für ein Fach als HTML-String.
+function buildGoalCardsHTML(plansObj) {
+  const activeGoals = Object.keys(plansObj).filter(g => {
+    const val = plansObj[g];
+    return val && (typeof val === 'object' ? val.level > 0 : val > 0);
+  });
+  return activeGoals.map(goalName => {
     const val = plansObj[goalName];
     const level = typeof val === 'object' ? val.level : val;
     const measures = (val && typeof val === 'object' && Array.isArray(val.measures)) ? val.measures : [];
@@ -1531,6 +1598,80 @@ function renderSubjectDetailContent(student, subject) {
   }).join('');
 }
 
+// Rendert die fertigen Förderpläne (PDF) eines Schülers, nach Schuljahr gruppiert
+// und aufklappbar. Wird sowohl im Dashboard als auch in der Schüler-Verwaltung genutzt.
+function renderHistoryPdfList(student, historyBody) {
+  if (!historyBody) return;
+  const history = student.history || [];
+
+  // Nach Schuljahr gruppieren
+  const grouped = {};
+  history.forEach(entry => {
+    const sy = getSchoolYear(entry.date);
+    if (!grouped[sy]) grouped[sy] = [];
+    grouped[sy].push(entry);
+  });
+
+  // Aktuelles Schuljahr immer anzeigen
+  const now = new Date();
+  const curMonth = now.getMonth() + 1;
+  const curYear = now.getFullYear();
+  const currentSY = curMonth >= 8 ? `${curYear}/${curYear + 1}` : `${curYear - 1}/${curYear}`;
+  if (!grouped[currentSY]) grouped[currentSY] = [];
+
+  // Neuestes Schuljahr zuerst
+  const sortedYears = Object.keys(grouped).sort((a, b) => parseInt(b) - parseInt(a));
+
+  historyBody.innerHTML = sortedYears.map(sy => {
+    const entries = grouped[sy];
+    const entriesHTML = entries.length === 0
+      ? `<p class="tile-empty-state" style="padding: 10px 0 6px;">Keine Förderpläne für dieses Schuljahr.</p>`
+      : entries.map(entry => {
+          const safeName = student.name.replace(/\s+/g, '_');
+          const safeFach = entry.subject ? subjectConfig[entry.subject].name.replace(/\s+/g, '_') : 'Alle';
+          const safeDate = entry.date.replace(/\./g, '-');
+          const filename = `Förderplan_${safeName}_${safeFach}_${safeDate}.pdf`;
+          return `
+            <div class="history-entry history-entry-clickable" data-entry-id="${escapeHTML(entry.id)}" data-filename="${escapeHTML(filename)}">
+              <span class="history-entry-label">${escapeHTML(filename)}</span>
+            </div>
+          `;
+        }).join('');
+
+    return `
+      <div class="history-year-tile" data-sy="${escapeHTML(sy)}">
+        <div class="history-year-header">
+          <span class="history-year-label">Schuljahr ${escapeHTML(sy)}</span>
+          <span class="history-year-chevron">&#8250;</span>
+        </div>
+        <div class="history-year-content">${entriesHTML}</div>
+      </div>
+    `;
+  }).join('');
+
+  historyBody.querySelectorAll('.history-year-header').forEach(header => {
+    header.addEventListener('click', (e) => {
+      e.stopPropagation();
+      header.closest('.history-year-tile').classList.toggle('open');
+    });
+  });
+
+  historyBody.querySelectorAll('.history-entry-clickable').forEach(row => {
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const entry = history.find(h => h.id === row.dataset.entryId);
+      if (!entry) return;
+      try {
+        const tempStudent = { name: student.name, plans: entry.plans, stammdaten: entry.stammdaten || student.stammdaten || {} };
+        const doc = generateFoerderplan(tempStudent, entry.date, entry.erstelltVon);
+        showPDFPreview(doc, row.dataset.filename);
+      } catch (err) {
+        showToast('PDF konnte nicht erstellt werden.', 'error');
+      }
+    });
+  });
+}
+
 // --- Stammdaten ---
 function stammdatenAktualisiert(student) {
   const sd = student?.stammdaten;
@@ -1538,10 +1679,11 @@ function stammdatenAktualisiert(student) {
   return Object.values(sd).some(v => v && v !== '');
 }
 
-function openStammdatenEdit() {
+function openStammdatenEdit(origin = 'dashboard') {
   const student = state.students.find(s => s.id === state.selectedStudentId);
   if (!student) return;
   state.stammdatenEditMode = true;
+  state.stammdatenEditOrigin = origin;
 
   document.getElementById('anlegen-name').value = student.name;
   const sd = student.stammdaten || {};
@@ -1623,9 +1765,14 @@ function saveStammdatenEdit() {
 
   DOM.schuelerAnlegenView.classList.remove('active');
   const student = state.students[idx];
-  DOM.studentDashboardName.textContent = `${student.name} · Förderpläne`;
-  renderStudentDashboardTiles(student);
-  DOM.studentDashboardView.classList.add('active');
+  if (state.stammdatenEditOrigin === 'verwaltung') {
+    state.stammdatenEditOrigin = null;
+    openSchuelerDetailVerwaltung(student.id);
+  } else {
+    DOM.studentDashboardName.textContent = `${student.name} · Förderpläne`;
+    renderStudentDashboardTiles(student);
+    DOM.studentDashboardView.classList.add('active');
+  }
   renderStudents();
   showToast('Stammdaten wurden aktualisiert.');
 }
@@ -1673,6 +1820,26 @@ function saveNeuerSchueler() {
   const name = document.getElementById('anlegen-name').value.trim();
   if (!name) { showToast('Bitte einen Namen eingeben.', 'error'); return; }
 
+  // Warnung bei gleichnamigem, aktivem Schüler (zwei Kinder können gleich heißen → nur Nachfrage).
+  const isDuplicate = state.students.some(
+    s => !s.archived && s.name.trim().toLowerCase() === name.toLowerCase()
+  );
+  if (isDuplicate && typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: 'Name bereits vorhanden',
+      text: `Es gibt bereits einen aktiven Schüler namens „${name}". Trotzdem anlegen?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Trotzdem anlegen',
+      cancelButtonText: 'Abbrechen',
+      confirmButtonColor: '#334155'
+    }).then(r => { if (r.isConfirmed) finalizeNeuerSchueler(name); });
+    return;
+  }
+  finalizeNeuerSchueler(name);
+}
+
+function finalizeNeuerSchueler(name) {
   const radio = n => document.querySelector(`input[name="${n}"]:checked`)?.value || null;
   const val   = id => document.getElementById(id)?.value.trim() || '';
 
@@ -1847,6 +2014,34 @@ function navigateToArchiv() {
   setGearButtonVisible(true);
 }
 
+// Sichert alle Schülerdaten + Zeiträume der Schule als JSON-Datei (lokaler Download).
+function exportAllData() {
+  try {
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      schoolId: state.currentUser ? state.currentUser.schoolId : null,
+      exportedBy: state.currentUser ? state.currentUser.name : null,
+      zeitraum: state.zeitraum,
+      students: state.students
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const datum = new Date().toISOString().slice(0, 10);
+    const schule = (state.currentUser && state.currentUser.schoolId) || 'schule';
+    a.href = url;
+    a.download = `Foerderplan-Backup_${schule}_${datum}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast(`Backup mit ${state.students.length} Schüler(n) erstellt.`);
+  } catch (e) {
+    console.error('Fehler beim Export:', e);
+    showToast('Backup konnte nicht erstellt werden.', 'error');
+  }
+}
+
 function renderArchiv() {
   const list = document.getElementById('archiv-list');
   const archived = state.students.filter(s => s.archived);
@@ -1919,6 +2114,7 @@ function openSchuelerDetailVerwaltung(studentId) {
   state.selectedStudentId = studentId;
   DOM.schuelerDetailVerwaltungTitle.textContent = student.name;
   renderStammdatenInTile(student, document.getElementById('tile-stammdaten-verwaltung-body'));
+  renderHistoryPdfList(student, document.getElementById('tile-foerderplaene-verwaltung-body'));
   DOM.dashboardGrid.classList.add('hidden');
   DOM.schuelerDetailVerwaltungView.classList.add('active');
   setGearButtonVisible(true);
@@ -1978,75 +2174,7 @@ function renderStudentDashboardTiles(student) {
   if (historyTile) historyTile.style.display = state.mode === 'erstellen' ? 'none' : '';
 
   // Render "Alte Förderpläne" tile
-  const historyBody = document.querySelector('#tile-alte-foerderplaene .subject-tile-body');
-  const history = student.history || [];
-
-  // Group entries by school year
-  const grouped = {};
-  history.forEach(entry => {
-    const sy = getSchoolYear(entry.date);
-    if (!grouped[sy]) grouped[sy] = [];
-    grouped[sy].push(entry);
-  });
-
-  // Always include current school year
-  const now = new Date();
-  const curMonth = now.getMonth() + 1;
-  const curYear = now.getFullYear();
-  const currentSY = curMonth >= 8 ? `${curYear}/${curYear + 1}` : `${curYear - 1}/${curYear}`;
-  if (!grouped[currentSY]) grouped[currentSY] = [];
-
-  // Sort newest first
-  const sortedYears = Object.keys(grouped).sort((a, b) => parseInt(b) - parseInt(a));
-
-  historyBody.innerHTML = sortedYears.map(sy => {
-    const entries = grouped[sy];
-    const entriesHTML = entries.length === 0
-      ? `<p class="tile-empty-state" style="padding: 10px 0 6px;">Keine Förderpläne für dieses Schuljahr.</p>`
-      : entries.map(entry => {
-          const safeName = student.name.replace(/\s+/g, '_');
-          const safeFach = entry.subject ? subjectConfig[entry.subject].name.replace(/\s+/g, '_') : 'Alle';
-          const safeDate = entry.date.replace(/\./g, '-');
-          const filename = `Förderplan_${safeName}_${safeFach}_${safeDate}.pdf`;
-          return `
-            <div class="history-entry history-entry-clickable" data-entry-id="${escapeHTML(entry.id)}" data-filename="${escapeHTML(filename)}">
-              <span class="history-entry-label">${escapeHTML(filename)}</span>
-            </div>
-          `;
-        }).join('');
-
-    return `
-      <div class="history-year-tile" data-sy="${escapeHTML(sy)}">
-        <div class="history-year-header">
-          <span class="history-year-label">Schuljahr ${escapeHTML(sy)}</span>
-          <span class="history-year-chevron">&#8250;</span>
-        </div>
-        <div class="history-year-content">${entriesHTML}</div>
-      </div>
-    `;
-  }).join('');
-
-  historyBody.querySelectorAll('.history-year-header').forEach(header => {
-    header.addEventListener('click', (e) => {
-      e.stopPropagation();
-      header.closest('.history-year-tile').classList.toggle('open');
-    });
-  });
-
-  historyBody.querySelectorAll('.history-entry-clickable').forEach(row => {
-    row.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const entry = history.find(h => h.id === row.dataset.entryId);
-      if (!entry) return;
-      try {
-        const tempStudent = { name: student.name, plans: entry.plans, stammdaten: entry.stammdaten || student.stammdaten || {} };
-        const doc = generateFoerderplan(tempStudent, entry.date);
-        showPDFPreview(doc, row.dataset.filename);
-      } catch (err) {
-        showToast('PDF konnte nicht erstellt werden.', 'error');
-      }
-    });
-  });
+  renderHistoryPdfList(student, document.querySelector('#tile-alte-foerderplaene .subject-tile-body'));
 
   ['allgemein', 'mathe', 'englisch', 'deutsch'].forEach(subject => {
     const tile = document.getElementById(`tile-${subject}`);
@@ -2133,7 +2261,12 @@ function setupEventListeners() {
       const titleEl = document.querySelector('#schueler-anlegen-view .home-title');
       if (titleEl) titleEl.textContent = 'Schüler anlegen';
       DOM.schuelerAnlegenView.classList.remove('active');
-      DOM.studentDashboardView.classList.add('active');
+      if (state.stammdatenEditOrigin === 'verwaltung') {
+        state.stammdatenEditOrigin = null;
+        openSchuelerDetailVerwaltung(state.selectedStudentId);
+      } else {
+        DOM.studentDashboardView.classList.add('active');
+      }
     } else {
       DOM.schuelerAnlegenView.classList.remove('active');
       DOM.schuelerVerwaltungView.classList.add('active');
@@ -2170,6 +2303,7 @@ function setupEventListeners() {
     DOM.verwaltungView.classList.add('active');
   });
   DOM.verwaltungTileArchiv.addEventListener('click', navigateToArchiv);
+  if (DOM.verwaltungTileExport) DOM.verwaltungTileExport.addEventListener('click', exportAllData);
   DOM.btnBackFromArchiv.addEventListener('click', () => {
     DOM.archivView.classList.remove('active');
     DOM.verwaltungView.classList.add('active');
@@ -2185,11 +2319,20 @@ function setupEventListeners() {
     e.preventDefault();
     const name = document.getElementById('lehrer-name').value.trim();
     const email = document.getElementById('lehrer-email').value.trim();
+    const errEl = document.getElementById('lehrer-error');
     if (!name || !email) {
-      document.getElementById('lehrer-error').textContent = 'Bitte Name und E-Mail angeben.';
+      errEl.textContent = 'Bitte Name und E-Mail angeben.';
+      return;
+    }
+    if (!isValidEmail(email)) {
+      errEl.textContent = 'Bitte eine gültige E-Mail-Adresse eingeben.';
       return;
     }
     createLehrer(name, email);
+  });
+  document.getElementById('btn-stammdaten-edit-verwaltung').addEventListener('click', () => {
+    DOM.schuelerDetailVerwaltungView.classList.remove('active');
+    openStammdatenEdit('verwaltung');
   });
   document.getElementById('btn-schueler-archivieren').addEventListener('click', () => {
     const student = state.students.find(s => s.id === state.selectedStudentId);
@@ -2445,17 +2588,12 @@ async function loadZeitraumFromFirestore() {
 // Schreibt den Zeitraum nach Firestore und aktualisiert den Cache.
 function saveZeitraumData(data) {
   state.zeitraum = data;
-  return zeitraumDocRef().set(data).catch(e => {
-    console.error('Fehler beim Speichern des Zeitraums:', e);
-    showToast('Fehler beim Speichern des Zeitraums.', 'error');
-  });
+  return trackSave(zeitraumDocRef().set(data));
 }
 
 function clearZeitraumData() {
   state.zeitraum = { schuljahr: {}, foerderplan: {}, elterngespraeche: {} };
-  return zeitraumDocRef().delete().catch(e => {
-    console.error('Fehler beim Löschen des Zeitraums:', e);
-  });
+  return trackSave(zeitraumDocRef().delete());
 }
 
 function todayStr() {
@@ -2571,8 +2709,6 @@ function renderFristenTile() {
 function setHeader(text) {
   const el = document.getElementById('logo-text');
   if (el) el.textContent = text;
-  // Blaue Kopfleiste nur auf der Startseite.
-  document.body.classList.toggle('home-active', text === 'Förderplan · Startseite');
 }
 
 // --- Home Navigation ---
@@ -2966,13 +3102,27 @@ function init() {
   db = firebase.firestore();
   setupEventListeners();
   setupAuthListeners();
+  setupConnectivityWatch();
   firebase.auth().onAuthStateChanged(handleAuthStateChanged);
+}
+
+// Zeigt einen Hinweis, wenn keine Internetverbindung besteht.
+function setupConnectivityWatch() {
+  const update = () => {
+    if (DOM.offlineBanner) {
+      DOM.offlineBanner.style.display = navigator.onLine ? 'none' : '';
+    }
+  };
+  window.addEventListener('online', update);
+  window.addEventListener('offline', update);
+  update();
 }
 
 // Läuft nach erfolgreichem Login (und ggf. Passwortwechsel): lädt Schul-Daten.
 async function bootApp() {
   state.students = await storage.loadData();
   await loadZeitraumFromFirestore();
+  await loadSchoolName();
   renderStudents();
   updateHomeTileErstellen();
   updateHomeTileGespraeche();
@@ -2980,9 +3130,19 @@ async function bootApp() {
   renderHomeUebersicht();
   renderFristenTile();
   applyRoleUI();
-  // Boot landet auf der Startseite → blaue Kopfleiste aktivieren.
-  document.body.classList.add('home-active');
   showAppView();
+}
+
+// Lädt den Anzeigenamen der Schule (für PDF-Kopf). Fehlerhaft/leer → schoolId als Fallback.
+async function loadSchoolName() {
+  try {
+    if (!state.currentUser || !state.currentUser.schoolId) { state.schoolName = ''; return; }
+    const doc = await db.collection('schools').doc(state.currentUser.schoolId).get();
+    state.schoolName = (doc.exists && doc.data().name) ? doc.data().name : '';
+  } catch (e) {
+    console.error('Fehler beim Laden des Schulnamens:', e);
+    state.schoolName = '';
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

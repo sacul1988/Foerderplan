@@ -8,6 +8,11 @@ rules_version = '2';
 //   schools/{schoolId}                       { name, ... }         (per Konsole angelegt)
 //   schools/{schoolId}/students/{studentId}  Schülerdaten
 //   schools/{schoolId}/meta/{docId}          z.B. "zeitraum"
+//
+// Sicherheitsprinzipien:
+//   - Strikte Trennung nach Schule (schoolId). Niemand sieht fremde Schulen.
+//   - Rollen (admin/lehrer) sind nicht durch den Client fälschbar.
+//   - "Alle sehen alle" NUR innerhalb derselben Schule.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -16,7 +21,13 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Profil des aktuell angemeldeten Nutzers.
+    // Existiert überhaupt ein Profil zum angemeldeten Nutzer?
+    function hasProfile() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // Profil des aktuell angemeldeten Nutzers (nur aufrufen, wenn hasProfile()).
     function myUser() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
@@ -26,7 +37,12 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && myUser().role == 'admin';
+      return hasProfile() && myUser().role == 'admin';
+    }
+
+    // Gehört der/die Angemeldete zur angefragten Schule?
+    function inSchool(schoolId) {
+      return hasProfile() && myUser().schoolId == schoolId;
     }
 
     // ---- Nutzerprofile ----
@@ -38,11 +54,17 @@ service cloud.firestore {
       );
 
       // Admin darf Lehrkräfte seiner eigenen Schule anlegen.
+      // Nur erlaubte Felder, Rolle fix 'lehrer', Passwortwechsel erzwungen.
       allow create: if isAdmin() &&
         request.resource.data.schoolId == mySchool() &&
-        request.resource.data.role == 'lehrer';
+        request.resource.data.role == 'lehrer' &&
+        request.resource.data.mustChangePassword == true &&
+        request.resource.data.keys().hasOnly(
+          ['email', 'name', 'role', 'schoolId', 'mustChangePassword']
+        );
 
-      // Eigenes Profil aktualisieren (z.B. mustChangePassword) – Rolle und Schule bleiben fix.
+      // Eigenes Profil aktualisieren (z.B. mustChangePassword) –
+      // Rolle und Schule bleiben unveränderlich (keine Selbst-Eskalation).
       allow update: if isSignedIn() && request.auth.uid == uid &&
         request.resource.data.role == resource.data.role &&
         request.resource.data.schoolId == resource.data.schoolId;
@@ -50,24 +72,27 @@ service cloud.firestore {
       // Admin darf Lehrkräfte seiner Schule entfernen (keine Admins, nicht sich selbst).
       allow delete: if isAdmin() &&
         resource.data.schoolId == mySchool() &&
-        resource.data.role == 'lehrer';
+        resource.data.role == 'lehrer' &&
+        uid != request.auth.uid;
     }
 
     // ---- Schul-Daten ----
     match /schools/{schoolId} {
       // Das Schul-Dokument selbst wird per Konsole gepflegt; lesen für die eigene Schule erlaubt.
-      allow read: if isSignedIn() && mySchool() == schoolId;
+      allow read: if inSchool(schoolId);
       allow write: if false;
 
       // Schülerdaten: nur Nutzer derselben Schule.
       match /students/{studentId} {
-        allow read, write: if isSignedIn() && mySchool() == schoolId;
+        allow read, write: if inSchool(schoolId);
       }
 
       // Einstellungen/Zeiträume: nur Nutzer derselben Schule.
       match /meta/{docId} {
-        allow read, write: if isSignedIn() && mySchool() == schoolId;
+        allow read, write: if inSchool(schoolId);
       }
     }
+
+    // Alles andere ist standardmäßig verboten (implizites deny).
   }
 }
