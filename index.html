@@ -6,8 +6,19 @@
   <title>Lern-Förderplan - Kernfunktion</title>
   <meta name="description" content="Digitale Plattform zur Erstellung und Verwaltung von Lern-Förderplänen in Schulen.">
   
+  <!-- Schriftart: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <!-- Firebase (compat-SDK, stellt globales `firebase` bereit) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+  <script src="./firebase-config.js"></script>
 
   <!-- Flatpickr -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -17,15 +28,65 @@
 </head>
 <body>
 
+  <!-- ================= AUTH-OVERLAY (Login / Passwort ändern) ================= -->
+  <div class="auth-overlay" id="auth-overlay">
+    <!-- Ladeanzeige, bis Firebase den Anmeldestatus geklärt hat -->
+    <div class="auth-loading" id="auth-loading">
+      <div class="auth-spinner" aria-label="Wird geladen"></div>
+    </div>
+    <!-- Login -->
+    <div class="auth-card glass-card" id="login-view" style="display:none;">
+      <div class="auth-logo">
+        <div class="logo-badge">FP</div>
+        <span class="auth-logo-text">Förderplan · Assistent</span>
+      </div>
+      <h2 class="auth-title">Anmelden</h2>
+      <form id="login-form" class="auth-form" autocomplete="on">
+        <label class="auth-label" for="login-email">Dienst-E-Mail</label>
+        <input type="email" id="login-email" class="form-input" autocomplete="username" required>
+        <label class="auth-label" for="login-password">Passwort</label>
+        <input type="password" id="login-password" class="form-input" autocomplete="current-password" required>
+        <div class="auth-error" id="login-error" role="alert"></div>
+        <button type="submit" class="btn-auth-primary" id="btn-login">Anmelden</button>
+      </form>
+      <button type="button" class="auth-link" id="btn-forgot-password">Passwort vergessen?</button>
+    </div>
+
+    <!-- Erzwungener Passwort-Wechsel beim ersten Login -->
+    <div class="auth-card glass-card" id="passwort-aendern-view" style="display:none;">
+      <div class="auth-logo">
+        <div class="logo-badge">FP</div>
+        <span class="auth-logo-text">Förderplan · Assistent</span>
+      </div>
+      <h2 class="auth-title">Neues Passwort festlegen</h2>
+      <p class="auth-subtitle">Bitte lege beim ersten Login ein eigenes, sicheres Passwort fest.</p>
+      <form id="pw-change-form" class="auth-form" autocomplete="off">
+        <label class="auth-label" for="pw-neu">Neues Passwort</label>
+        <input type="password" id="pw-neu" class="form-input" autocomplete="new-password" minlength="6" required>
+        <label class="auth-label" for="pw-neu-bestaetigung">Passwort bestätigen</label>
+        <input type="password" id="pw-neu-bestaetigung" class="form-input" autocomplete="new-password" minlength="6" required>
+        <div class="auth-error" id="pw-change-error" role="alert"></div>
+        <button type="submit" class="btn-auth-primary" id="btn-pw-change">Passwort speichern &amp; fortfahren</button>
+      </form>
+    </div>
+  </div>
+
   <!-- App Header -->
   <header class="app-header">
     <div class="logo-container" id="logo-home-btn" role="button" tabindex="0" title="Zur Startseite" style="cursor:pointer;">
-      <div class="logo-badge">FP</div>
-      <h1 class="logo-text" id="logo-text">Förderplan · Assistent</h1>
+      <div class="logo-badge">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg>
+      </div>
+      <h1 class="logo-text" id="logo-text">Förderplan · Startseite</h1>
     </div>
-    <button type="button" id="btn-verwaltung-header" class="btn-header-verwaltung" title="Verwaltung">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </button>
+    <div class="header-actions">
+      <button type="button" id="btn-verwaltung-header" class="btn-header-verwaltung" title="Verwaltung">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <button type="button" id="btn-logout-header" class="btn-header-verwaltung" title="Abmelden">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
   </header>
 
   <!-- Main Container -->
@@ -82,6 +143,11 @@
           <div class="home-tile-title">Schüler verwalten</div>
           <div class="home-tile-desc">Schüler hinzufügen, archivieren und löschen</div>
         </button>
+        <button class="home-tile" id="verwaltung-tile-lehrer" type="button">
+          <div class="home-tile-icon home-tile-icon--verwaltung">L</div>
+          <div class="home-tile-title">Lehrkräfte verwalten</div>
+          <div class="home-tile-desc">Kolleginnen und Kollegen hinzufügen und entfernen</div>
+        </button>
         <button class="home-tile" id="verwaltung-tile-zeitraum" type="button">
           <div class="home-tile-icon home-tile-icon--zeitraum">Z</div>
           <div class="home-tile-title">Zeiträume festlegen</div>
@@ -97,6 +163,36 @@
           <div class="home-tile-title">Archiv</div>
           <div class="home-tile-desc">Archivierte Schüler verwalten und löschen</div>
         </button>
+      </div>
+    </div>
+
+    <!-- ================= LEHRKRÄFTE VERWALTUNG VIEW ================= -->
+    <div class="home-view" id="lehrer-verwaltung-view">
+      <div class="subview-header">
+        <button type="button" class="btn-back-circle" id="btn-back-from-lehrer-verwaltung">&#8592;</button>
+        <h2 class="home-title">Lehrkräfte verwalten</h2>
+      </div>
+      <div class="lehrer-verwaltung-container">
+        <div class="glass-card lehrer-card">
+          <h3 class="lehrer-card-title">Neue Lehrkraft hinzufügen</h3>
+          <form id="lehrer-form" class="lehrer-form" autocomplete="off">
+            <div class="form-group">
+              <label class="form-label" for="lehrer-name">Name</label>
+              <input type="text" id="lehrer-name" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="lehrer-email">Dienst-E-Mail</label>
+              <input type="email" id="lehrer-email" class="form-input" autocomplete="off" required>
+            </div>
+            <div class="lehrer-starter-hint" id="lehrer-starter-hint"></div>
+            <div class="auth-error" id="lehrer-error" role="alert"></div>
+            <button type="submit" class="btn-schueler-anlegen" id="btn-lehrer-anlegen">Lehrkraft anlegen</button>
+          </form>
+        </div>
+        <div class="glass-card lehrer-card">
+          <h3 class="lehrer-card-title">Lehrkräfte an dieser Schule</h3>
+          <div id="lehrer-liste"></div>
+        </div>
       </div>
     </div>
 
@@ -150,13 +246,22 @@
 
           <div class="stammdaten-form-row">
             <div class="stammdaten-form-cell">
-              <span class="stammdaten-form-label">Förderbedarfe:</span>
+              <span class="stammdaten-form-label">Förderbedarf:</span>
+              <select class="form-input" id="anlegen-foerderbedarf-select">
+                <option value="">– bitte wählen –</option>
+                <option value="Lernen">Lernen</option>
+                <option value="Emotionale und Soziale Entwicklung">Emotionale und Soziale Entwicklung</option>
+                <option value="Hören und Kommunikation">Hören und Kommunikation</option>
+              </select>
             </div>
             <div class="stammdaten-form-cell">
-              <div class="radio-group">
-                <label class="radio-label"><input type="radio" name="anlegen-foerderbedarf" value="zielgleich"> Zielgleich</label>
-                <label class="radio-label"><input type="radio" name="anlegen-foerderbedarf" value="zieldifferent"> Zieldifferent</label>
-              </div>
+              <span class="stammdaten-form-label">Weiterer Förderbedarf:</span>
+              <select class="form-input" id="anlegen-foerderbedarf-weiterer">
+                <option value="">– bitte wählen –</option>
+                <option value="Lernen">Lernen</option>
+                <option value="Emotionale und Soziale Entwicklung">Emotionale und Soziale Entwicklung</option>
+                <option value="Hören und Kommunikation">Hören und Kommunikation</option>
+              </select>
             </div>
           </div>
 
@@ -176,22 +281,11 @@
 
           <div class="stammdaten-form-row">
             <div class="stammdaten-form-cell">
-              <span class="stammdaten-form-label">Wichtig:</span>
-              <input type="text" class="form-input" id="anlegen-wichtig" autocomplete="off">
-            </div>
-            <div class="stammdaten-form-cell">
               <span class="stammdaten-form-label">Thematische Teilnahme am Regelunterricht:</span>
               <div class="radio-group">
                 <label class="radio-label"><input type="radio" name="anlegen-thematische-teilnahme" value="ja"> ja</label>
                 <label class="radio-label"><input type="radio" name="anlegen-thematische-teilnahme" value="nein"> nein</label>
               </div>
-            </div>
-          </div>
-
-          <div class="stammdaten-form-row">
-            <div class="stammdaten-form-cell">
-              <span class="stammdaten-form-label">Zuständigkeit:</span>
-              <input type="text" class="form-input" id="anlegen-zustaendigkeit" autocomplete="off">
             </div>
             <div class="stammdaten-form-cell">
               <span class="stammdaten-form-label">Noten:</span>
@@ -213,7 +307,7 @@
 
         </div>
 
-        <button type="button" class="btn-save-fab" id="btn-save-neuer-schueler" title="Schüler anlegen">&#10003;</button>
+        <button type="button" class="btn-schueler-anlegen" id="btn-save-neuer-schueler">Schüler anlegen</button>
       </div>
     </div>
 
@@ -309,7 +403,7 @@
       </section>
 
       <!-- Right Column: Student List -->
-      <section class="glass-card" aria-labelledby="student-list-title">
+      <section class="glass-card" id="student-list-view" aria-labelledby="student-list-title">
         <div class="student-list-header">
           <button type="button" class="btn-back-circle student-list-back-btn" id="btn-back-from-list" title="Zurück">&#8592;</button>
           <h2 id="student-list-title">Schülerübersicht</h2>
@@ -425,7 +519,6 @@
           <button type="button" id="btn-back-from-detail" class="btn-back-circle" title="Zurück" aria-label="Zurück">&#8592;</button>
           <div>
             <h2 id="subject-detail-title" class="workspace-title">Fach</h2>
-            <div class="workspace-subtitle">Schüler: <strong id="subject-detail-student">Name</strong></div>
           </div>
         </div>
       </div>
@@ -466,7 +559,7 @@
           <label class="form-label" for="custom-goal-input">Eigenes Förderziel ergänzen</label>
           <div class="custom-goal-input-row">
             <input type="text" id="custom-goal-input" class="form-input" placeholder="Zielsatz formulieren..." autocomplete="off">
-            <button type="button" id="btn-add-custom-goal" class="btn-add-circle" title="Hinzufügen" aria-label="Hinzufügen">+</button>
+            <button type="button" id="btn-add-custom-goal" class="btn-add-circle" title="Hinzufügen" aria-label="Hinzufügen"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="18" height="18"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
           </div>
         </div>
 

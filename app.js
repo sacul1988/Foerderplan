@@ -1,6 +1,6 @@
 /**
  * Digitaler Lern-Förderplan - Kernfunktion (Professional Edition)
- * Clientseitige Anwendungslogik mit localStorage-Persistenz, Vollbild-Workspace und Bewertungsskala
+ * Anwendungslogik mit Firebase-Auth (Login/Rollen), Firestore-Persistenz pro Schule, Vollbild-Workspace und Bewertungsskala
  */
 
 // --- Default Goals Database ---
@@ -358,6 +358,10 @@ deutsch: [
 // --- Application State ---
 const state = {
   students: [],
+  // Angemeldete Lehrkraft: { uid, email, name, role: 'admin'|'lehrer', schoolId }
+  currentUser: null,
+  // In-Memory-Cache der Zeitraum-Daten (aus Firestore geladen)
+  zeitraum: null,
   selectedStudentId: null,
   selectedSubject: null,
   mode: null, // 'default' | 'einsehen'
@@ -426,6 +430,9 @@ const DOM = {
   homeTileErstellenDesc: document.getElementById('home-tile-erstellen-desc'),
   homeTileErstellenHint: document.getElementById('home-tile-erstellen-hint'),
   logoHomeBtn: document.getElementById('logo-home-btn'),
+  verwaltungTileLehrer: document.getElementById('verwaltung-tile-lehrer'),
+  lehrerVerwaltungView: document.getElementById('lehrer-verwaltung-view'),
+  btnBackFromLehrerVerwaltung: document.getElementById('btn-back-from-lehrer-verwaltung'),
   studentForm: document.getElementById('student-form'),
   studentNameInput: document.getElementById('student-name'),
   studentList: document.getElementById('student-list'),
@@ -463,7 +470,6 @@ const DOM = {
   // Subject Detail View
   subjectDetailView: document.getElementById('subject-detail-view'),
   subjectDetailTitle: document.getElementById('subject-detail-title'),
-  subjectDetailStudent: document.getElementById('subject-detail-student'),
   subjectDetailContent: document.getElementById('subject-detail-content'),
   btnBackFromDetail: document.getElementById('btn-back-from-detail'),
 
@@ -476,58 +482,94 @@ const DOM = {
   toastContainer: document.getElementById('toast-container')
 };
 
-// --- Local Storage Helpers ---
-const storage = {
-  loadData() {
-    try {
-      const stored = localStorage.getItem('foerderplan_students');
-      const parsed = stored ? JSON.parse(stored) : [];
-      
-      // Ensure goals are loaded as key-value objects { goal: level }
-      return parsed.map(student => {
-        if (!student.plans) student.plans = {};
-        ['allgemein', 'mathe', 'englisch', 'deutsch'].forEach(sub => {
-          if (Array.isArray(student.plans[sub])) {
-            // Backward compatibility: Convert string array to level 3 (hoher)
-            const obj = {};
-            student.plans[sub].forEach(goal => {
-              obj[goal] = 3;
-            });
-            student.plans[sub] = obj;
-          } else if (typeof student.plans[sub] === 'string') {
-            student.plans[sub] = {};
-          } else if (typeof student.plans[sub] === 'object' && student.plans[sub] !== null) {
-            // Normalize to new structure { level, measures } and clean up legacy levels
-            Object.keys(student.plans[sub]).forEach(goal => {
-              const val = student.plans[sub][goal];
-              if (typeof val === 'number') {
-                const cleanLvl = val === 1 ? 0 : val;
-                student.plans[sub][goal] = { level: cleanLvl, measures: [] };
-              } else if (val && typeof val === 'object') {
-                if (val.level === 1) val.level = 0;
-                if (!Array.isArray(val.measures)) val.measures = [];
-              } else {
-                student.plans[sub][goal] = { level: 0, measures: [] };
-              }
-            });
-          } else {
-            student.plans[sub] = {};
-          }
-        });
-        if (!student.history) student.history = [];
-        return student;
+// --- Firestore Datenschicht ---
+// `db` wird in init() nach dem Firebase-Init gesetzt.
+let db = null;
+
+// Collection der Schüler der aktuell angemeldeten Schule.
+function studentsCollection() {
+  return db.collection('schools').doc(state.currentUser.schoolId).collection('students');
+}
+
+// Zeitraum-Dokument der aktuellen Schule.
+function zeitraumDocRef() {
+  return db.collection('schools').doc(state.currentUser.schoolId).collection('meta').doc('zeitraum');
+}
+
+// Normalisiert ein Schüler-Objekt und migriert Alt-Formate der Pläne.
+function normalizeStudent(student) {
+  if (!student.plans) student.plans = {};
+  ['allgemein', 'mathe', 'englisch', 'deutsch'].forEach(sub => {
+    if (Array.isArray(student.plans[sub])) {
+      // Backward compatibility: Convert string array to level 3 (hoher)
+      const obj = {};
+      student.plans[sub].forEach(goal => {
+        obj[goal] = 3;
       });
+      student.plans[sub] = obj;
+    } else if (typeof student.plans[sub] === 'string') {
+      student.plans[sub] = {};
+    } else if (typeof student.plans[sub] === 'object' && student.plans[sub] !== null) {
+      // Normalize to new structure { level, measures } and clean up legacy levels
+      Object.keys(student.plans[sub]).forEach(goal => {
+        const val = student.plans[sub][goal];
+        if (typeof val === 'number') {
+          const cleanLvl = val === 1 ? 0 : val;
+          student.plans[sub][goal] = { level: cleanLvl, measures: [] };
+        } else if (val && typeof val === 'object') {
+          if (val.level === 1) val.level = 0;
+          if (!Array.isArray(val.measures)) val.measures = [];
+        } else {
+          student.plans[sub][goal] = { level: 0, measures: [] };
+        }
+      });
+    } else {
+      student.plans[sub] = {};
+    }
+  });
+  if (!student.history) student.history = [];
+  return student;
+}
+
+const storage = {
+  // Lädt alle Schüler der aktuellen Schule aus Firestore.
+  async loadData() {
+    try {
+      const snap = await studentsCollection().get();
+      return snap.docs.map(doc => normalizeStudent({ ...doc.data(), id: doc.id }));
     } catch (e) {
       console.error('Fehler beim Laden:', e);
+      showToast('Fehler beim Laden der Schülerdaten.', 'error');
       return [];
     }
   },
+  // Speichert (Upsert) einen einzelnen Schüler.
+  saveStudent(student) {
+    return studentsCollection().doc(student.id).set(student).catch(e => {
+      console.error('Fehler beim Speichern:', e);
+      showToast('Fehler beim Speichern.', 'error');
+    });
+  },
+  // Löscht einen Schüler endgültig.
+  deleteStudent(id) {
+    return studentsCollection().doc(id).delete().catch(e => {
+      console.error('Fehler beim Löschen:', e);
+      showToast('Fehler beim Löschen.', 'error');
+    });
+  },
+  // Kompatibilitäts-Wrapper: schreibt alle übergebenen Schüler (Batch-Upsert).
   saveData(data) {
     try {
-      localStorage.setItem('foerderplan_students', JSON.stringify(data));
+      const col = studentsCollection();
+      const batch = db.batch();
+      data.forEach(s => batch.set(col.doc(s.id), s));
+      return batch.commit().catch(e => {
+        console.error('Fehler beim Speichern:', e);
+        showToast('Fehler beim Speichern.', 'error');
+      });
     } catch (e) {
       console.error('Fehler beim Speichern:', e);
-      showToast('Fehler bei der lokalen Speicherung.', 'error');
+      showToast('Fehler beim Speichern.', 'error');
     }
   },
 };
@@ -535,7 +577,7 @@ const storage = {
 // --- UI Toast Feedback ---
 function showToast(message, type = 'success') {
   const toast = document.createElement('div');
-  toast.className = `toast ${type === 'success' ? 'toast-success' : ''}`;
+  toast.className = `toast ${type === 'error' ? 'toast-error' : 'toast-success'}`;
   toast.innerHTML = `<span>${message}</span>`;
   
   DOM.toastContainer.appendChild(toast);
@@ -564,18 +606,9 @@ function renderStudents() {
     const studentCard = document.createElement('div');
     studentCard.className = 'student-card';
     studentCard.dataset.id = student.id;
-    
-    const initials = student.name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .substring(0, 2)
-      .toUpperCase();
-      
 
     studentCard.innerHTML = `
       <div class="student-info">
-        <div class="student-avatar">${initials}</div>
         <div class="student-name">${escapeHTML(student.name)}</div>
       </div>
     `;
@@ -600,8 +633,9 @@ function filterStudents(query) {
     if (matches) visibleCount++;
   });
 
-  DOM.emptyState.style.display = state.students.length === 0 ? 'flex' : 'none';
-  DOM.searchEmptyState.style.display = (q && visibleCount === 0 && state.students.length > 0) ? 'flex' : 'none';
+  const activeCount = state.students.filter(s => !s.archived).length;
+  DOM.emptyState.style.display = activeCount === 0 ? 'flex' : 'none';
+  DOM.searchEmptyState.style.display = (q && visibleCount === 0 && activeCount > 0) ? 'flex' : 'none';
 }
 
 function addStudent(name) {
@@ -622,15 +656,15 @@ function addStudent(name) {
   };
   
   state.students.push(newStudent);
-  storage.saveData(state.students);
+  storage.saveStudent(newStudent);
   renderStudents();
-  
+
   showToast(`Schüler/in "${trimmedName}" wurde angelegt.`);
 }
 
 function deleteStudent(id) {
   state.students = state.students.filter(s => s.id !== id);
-  storage.saveData(state.students);
+  storage.deleteStudent(id);
   renderStudents();
 
   if (state.selectedStudentId === id) {
@@ -687,7 +721,7 @@ function openWorkspace(subject) {
   if (!student) return;
 
   const subName = subjectConfig[subject].name;
-  DOM.workspaceTitle.textContent = `Förderplan erstellen | ${subName} | ${student.name}`;
+  DOM.workspaceTitle.textContent = `${student.name} · ${subName}`;
 
   // Resume unsaved draft when re-opening the same subject
   const resumingDraft = state.selectedSubject === subject && state.selectedGoals.length > 0;
@@ -776,11 +810,13 @@ function renderStep1(student, subject) {
   
   // Add student selected goals if they are missing
   Object.keys(state.editingPlans).forEach(g => {
-    if (state.editingPlans[g] > 0 && !structuredGoals.some(item => item.type === 'goal' && item.text === g)) {
+    const val = state.editingPlans[g];
+    const isGoalActive = val && (typeof val === 'object' ? val.level > 0 : val > 0);
+    if (isGoalActive && !structuredGoals.some(item => item.type === 'goal' && item.text === g)) {
       structuredGoals.unshift({ type: 'goal', text: g });
     }
   });
-  
+
   // Render list elements dynamically
   structuredGoals.forEach(item => {
     if (item.type === 'header') {
@@ -1079,7 +1115,67 @@ function renderStep3(student, subject) {
         listContainer.appendChild(label);
       });
     });
-    
+
+    // --- Eigene Maßnahmen (für alle Fächer) ---
+    const predefinedTexts = new Set();
+    measuresList.forEach(sg => sg.measures.forEach(m => predefinedTexts.add(m)));
+
+    const customHeader = document.createElement('div');
+    customHeader.className = 'measure-subgoal-header';
+    customHeader.textContent = 'Eigene Maßnahmen';
+    listContainer.appendChild(customHeader);
+
+    const customItemsBox = document.createElement('div');
+    customItemsBox.className = 'custom-measures-items';
+    listContainer.appendChild(customItemsBox);
+
+    const renderCustomMeasures = () => {
+      customItemsBox.innerHTML = '';
+      const customs = state.editingPlans[goalName].measures.filter(m => !predefinedTexts.has(m));
+      customs.forEach(measureText => {
+        const item = document.createElement('div');
+        item.className = 'measure-checkbox-item custom-measure-item';
+        item.style.paddingLeft = '12px';
+        item.innerHTML = `
+          <input type="checkbox" checked>
+          <span class="measure-checkbox-text">${escapeHTML(measureText)}</span>
+          <button type="button" class="btn-custom-measure-remove" title="Entfernen" aria-label="Entfernen">&times;</button>
+        `;
+        const removeIt = () => {
+          state.editingPlans[goalName].measures = state.editingPlans[goalName].measures.filter(m => m !== measureText);
+          renderCustomMeasures();
+        };
+        item.querySelector('input[type="checkbox"]').addEventListener('change', removeIt);
+        item.querySelector('.btn-custom-measure-remove').addEventListener('click', removeIt);
+        customItemsBox.appendChild(item);
+      });
+    };
+    renderCustomMeasures();
+
+    const addRow = document.createElement('div');
+    addRow.className = 'custom-measure-add-row';
+    addRow.innerHTML = `
+      <input type="text" class="form-input custom-measure-input" placeholder="Eigene Fördermaßnahme eingeben …" autocomplete="off">
+      <button type="button" class="btn-custom-measure-add">Hinzufügen</button>
+    `;
+    const cInput = addRow.querySelector('.custom-measure-input');
+    const cBtn = addRow.querySelector('.btn-custom-measure-add');
+    const addCustom = () => {
+      const text = cInput.value.trim();
+      if (!text) return;
+      if (!state.editingPlans[goalName].measures.includes(text)) {
+        state.editingPlans[goalName].measures.push(text);
+      }
+      cInput.value = '';
+      renderCustomMeasures();
+      cInput.focus();
+    };
+    cBtn.addEventListener('click', addCustom);
+    cInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addCustom(); }
+    });
+    listContainer.appendChild(addRow);
+
     DOM.workspaceGoalsChecklistStep3.appendChild(groupEl);
   });
 }
@@ -1109,7 +1205,7 @@ function saveWorkspaceGoals() {
   state.students[studentIndex].plans[subject] = finalPlansObj;
 
   const historyEntry = saveHistorySnapshot(studentIndex, subject);
-  storage.saveData(state.students);
+  storage.saveStudent(state.students[studentIndex]);
   renderStudents();
 
   try {
@@ -1223,12 +1319,11 @@ function generateFoerderplan(student, dateStr) {
   const sd = student.stammdaten || {};
   const _notenLabels = { ja: 'Ja', nein: 'Nein', 'ind-paed': 'Ind.-päd.', esa: 'ESA angestrebt (ab Kl 8)' };
   const sdRows = [
-    sd.foerderbedarf        ? ['Förderbedarf',         sd.foerderbedarf === 'zielgleich' ? 'Zielgleich' : 'Zieldifferent'] : null,
+    sd.foerderbedarf        ? ['Förderbedarf',         sd.foerderbedarf] : null,
+    sd.foerderbedarfWeiterer ? ['Weiterer Förderbedarf', sd.foerderbedarfWeiterer] : null,
     sd.nachteilsausgleich   ? ['Nachteilsausgleich',    sd.nachteilsausgleich === 'ja' ? 'Ja' : 'Nein'] : null,
     sd.beschulungsjahr      ? ['Beschulungsjahr',       sd.beschulungsjahr] : null,
-    sd.wichtig              ? ['Wichtig',               sd.wichtig] : null,
     sd.thematischeTeilnahme ? ['Thematische Teilnahme', sd.thematischeTeilnahme === 'ja' ? 'Ja' : 'Nein'] : null,
-    sd.zustaendigkeit       ? ['Zuständigkeit',         sd.zustaendigkeit] : null,
     sd.noten                ? ['Noten',                 _notenLabels[sd.noten] || sd.noten] : null,
     sd.bemerkungen          ? ['Bemerkungen',           sd.bemerkungen] : null,
   ].filter(Boolean);
@@ -1385,8 +1480,7 @@ function openSubjectDetailView(subject) {
   if (!student) return;
 
   const subName = subjectConfig[subject].name;
-  DOM.subjectDetailTitle.textContent = `${subName}`;
-  DOM.subjectDetailStudent.textContent = student.name;
+  DOM.subjectDetailTitle.textContent = `${student.name} · ${subName}`;
 
   renderSubjectDetailContent(student, subject);
 
@@ -1452,10 +1546,8 @@ function openStammdatenEdit() {
   document.getElementById('anlegen-name').value = student.name;
   const sd = student.stammdaten || {};
   document.querySelectorAll('#schueler-anlegen-view input[type="radio"]').forEach(r => r.checked = false);
-  ['foerderbedarf','nachteilsausgleich','thematische-teilnahme','noten'].forEach(name => {
-    const key = name.replace(/-([a-z])/g, (_, c) => c.toUpperCase()).replace('thematischeTeilnahme', 'thematischeTeilnahme');
-    const sdKey = name === 'foerderbedarf' ? 'foerderbedarf'
-                : name === 'nachteilsausgleich' ? 'nachteilsausgleich'
+  ['nachteilsausgleich','thematische-teilnahme','noten'].forEach(name => {
+    const sdKey = name === 'nachteilsausgleich' ? 'nachteilsausgleich'
                 : name === 'thematische-teilnahme' ? 'thematischeTeilnahme'
                 : 'noten';
     if (sd[sdKey]) {
@@ -1463,13 +1555,15 @@ function openStammdatenEdit() {
       if (r) r.checked = true;
     }
   });
+  document.getElementById('anlegen-foerderbedarf-select').value   = sd.foerderbedarf         || '';
+  document.getElementById('anlegen-foerderbedarf-weiterer').value = sd.foerderbedarfWeiterer || '';
   document.getElementById('anlegen-beschulungsjahr').value = sd.beschulungsjahr || '';
-  document.getElementById('anlegen-wichtig').value        = sd.wichtig          || '';
-  document.getElementById('anlegen-zustaendigkeit').value = sd.zustaendigkeit   || '';
   document.getElementById('anlegen-bemerkungen').value    = sd.bemerkungen      || '';
 
   const titleEl = document.querySelector('#schueler-anlegen-view .home-title');
   if (titleEl) titleEl.textContent = 'Stammdaten bearbeiten';
+  const btnEl = document.getElementById('btn-save-neuer-schueler');
+  if (btnEl) btnEl.textContent = 'Änderungen speichern';
 
   DOM.studentDashboardView.classList.remove('active');
   DOM.schuelerAnlegenView.classList.add('active');
@@ -1510,18 +1604,17 @@ function saveStammdatenEdit() {
 
   state.students[idx].name = name;
   state.students[idx].stammdaten = {
-    foerderbedarf:        radio('anlegen-foerderbedarf'),
+    foerderbedarf:        val('anlegen-foerderbedarf-select'),
+    foerderbedarfWeiterer: val('anlegen-foerderbedarf-weiterer'),
     nachteilsausgleich:   radio('anlegen-nachteilsausgleich'),
     beschulungsjahr:      val('anlegen-beschulungsjahr'),
-    wichtig:              val('anlegen-wichtig'),
     thematischeTeilnahme: radio('anlegen-thematische-teilnahme'),
-    zustaendigkeit:       val('anlegen-zustaendigkeit'),
     noten:                radio('anlegen-noten'),
     bemerkungen:          val('anlegen-bemerkungen'),
   };
   state.students[idx].stammdatenConfirmed = true;
   updateHistoryStammdatenForCurrentSchuljahr(idx);
-  storage.saveData(state.students);
+  storage.saveStudent(state.students[idx]);
   state.stammdatenEditMode = false;
   state.stammdatenConfirmed = true;
 
@@ -1530,7 +1623,7 @@ function saveStammdatenEdit() {
 
   DOM.schuelerAnlegenView.classList.remove('active');
   const student = state.students[idx];
-  DOM.studentDashboardName.textContent = `Förderpläne: ${student.name}`;
+  DOM.studentDashboardName.textContent = `${student.name} · Förderpläne`;
   renderStudentDashboardTiles(student);
   DOM.studentDashboardView.classList.add('active');
   renderStudents();
@@ -1546,12 +1639,11 @@ function renderStammdatenInTile(student, bodyEl) {
   }
   const notenLabels = { ja: 'Ja', nein: 'Nein', 'ind-paed': 'Ind.-päd.', esa: 'ESA angestrebt (ab Kl 8)' };
   const rows = [
-    sd.foerderbedarf       ? ['Förderbedarf',             sd.foerderbedarf === 'zielgleich' ? 'Zielgleich' : 'Zieldifferent'] : null,
+    sd.foerderbedarf       ? ['Förderbedarf',             sd.foerderbedarf] : null,
+    sd.foerderbedarfWeiterer ? ['Weiterer Förderbedarf',  sd.foerderbedarfWeiterer] : null,
     sd.nachteilsausgleich  ? ['Nachteilsausgleich',        sd.nachteilsausgleich === 'ja' ? 'Ja' : 'Nein'] : null,
     sd.beschulungsjahr     ? ['Beschulungsjahr',           sd.beschulungsjahr] : null,
-    sd.wichtig             ? ['Wichtig',                   sd.wichtig] : null,
     sd.thematischeTeilnahme? ['Thematische Teilnahme',     sd.thematischeTeilnahme === 'ja' ? 'Ja' : 'Nein'] : null,
-    sd.zustaendigkeit      ? ['Zuständigkeit',             sd.zustaendigkeit] : null,
     sd.noten               ? ['Noten',                     notenLabels[sd.noten] || sd.noten] : null,
     sd.bemerkungen         ? ['Bemerkungen',               sd.bemerkungen] : null,
   ].filter(Boolean);
@@ -1563,10 +1655,14 @@ function renderStammdatenInTile(student, bodyEl) {
 function navigateToSchuelerAnlegen() {
   document.getElementById('anlegen-name').value = '';
   document.querySelectorAll('#schueler-anlegen-view input[type="radio"]').forEach(r => r.checked = false);
-  ['anlegen-beschulungsjahr','anlegen-wichtig','anlegen-zustaendigkeit','anlegen-bemerkungen'].forEach(id => {
+  ['anlegen-foerderbedarf-select','anlegen-foerderbedarf-weiterer','anlegen-beschulungsjahr','anlegen-bemerkungen'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  const titleEl = document.querySelector('#schueler-anlegen-view .home-title');
+  if (titleEl) titleEl.textContent = 'Schüler anlegen';
+  const btnEl = document.getElementById('btn-save-neuer-schueler');
+  if (btnEl) btnEl.textContent = 'Schüler anlegen';
   setGearButtonVisible(true);
   DOM.schuelerVerwaltungView.classList.remove('active');
   DOM.schuelerAnlegenView.classList.add('active');
@@ -1585,21 +1681,19 @@ function saveNeuerSchueler() {
     name,
     archived: false,
     stammdaten: {
-      foerderbedarf:        radio('anlegen-foerderbedarf'),
+      foerderbedarf:        val('anlegen-foerderbedarf-select'),
+      foerderbedarfWeiterer: val('anlegen-foerderbedarf-weiterer'),
       nachteilsausgleich:   radio('anlegen-nachteilsausgleich'),
       beschulungsjahr:      val('anlegen-beschulungsjahr'),
-      wichtig:              val('anlegen-wichtig'),
       thematischeTeilnahme: radio('anlegen-thematische-teilnahme'),
-      zustaendigkeit:       val('anlegen-zustaendigkeit'),
       noten:                radio('anlegen-noten'),
       bemerkungen:          val('anlegen-bemerkungen'),
     },
     plans: { allgemein: {}, mathe: {}, englisch: {}, deutsch: {} },
     history: []
   };
-
   state.students.push(newStudent);
-  storage.saveData(state.students);
+  storage.saveStudent(newStudent);
   renderStudents();
   renderHomeUebersicht();
   showToast(`Schüler/in "${name}" wurde angelegt.`);
@@ -1647,7 +1741,6 @@ function renderHomeUebersicht() {
   countEl.textContent = `${incompleteStudents.length} Schüler mit offenen Plänen`;
 
   list.innerHTML = incompleteStudents.map(student => {
-    const initials = student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     const missingTags = subjects
       .filter(sub => !hasPlan(student, sub))
       .map(sub => `<span class="missing-subject-tag" data-subject="${sub}">${subjectLabels[sub]}</span>`)
@@ -1655,7 +1748,6 @@ function renderHomeUebersicht() {
 
     return `
       <div class="home-uebersicht-entry" data-student-id="${escapeHTML(student.id)}">
-        <div class="student-avatar">${escapeHTML(initials)}</div>
         <div class="home-uebersicht-entry-info">
           <div class="home-uebersicht-name">${escapeHTML(student.name)}</div>
           <div class="home-uebersicht-missing">${missingTags}</div>
@@ -1677,11 +1769,12 @@ function renderUebersicht() {
   const subjectLabels = { allgemein: 'Allgemein', mathe: 'Mathe', englisch: 'Englisch', deutsch: 'Deutsch' };
 
   const zeitraum = loadZeitraum();
+  const fp = zeitraum?.foerderplan || {};
   const zeitraumBar = document.getElementById('uebersicht-zeitraum-bar');
-  if (zeitraum && (zeitraum.von || zeitraum.bis)) {
+  if (fp.von || fp.bis) {
     const aktiv = isZeitraumAktiv(zeitraum);
-    const vonStr = zeitraum.von ? formatDate(zeitraum.von) : '–';
-    const bisStr = zeitraum.bis ? formatDate(zeitraum.bis) : '–';
+    const vonStr = fp.von ? formatDate(fp.von) : '–';
+    const bisStr = fp.bis ? formatDate(fp.bis) : '–';
     zeitraumBar.innerHTML = `
       <div class="zeitraum-status-info ${aktiv ? 'zeitraum-aktiv' : 'zeitraum-inaktiv'}">
         <div class="zeitraum-status-label">${aktiv ? 'Zeitraum aktiv' : 'Zeitraum inaktiv'}</div>
@@ -1705,7 +1798,6 @@ function renderUebersicht() {
   ).join('');
 
   const rows = activeStudents.map(student => {
-    const initials = student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     const cells = subjects.map(subject => {
       const done = hasPlan(student, subject);
       return `<div class="uebersicht-status-cell">
@@ -1718,7 +1810,6 @@ function renderUebersicht() {
     return `
       <div class="uebersicht-student-row">
         <div class="uebersicht-student-name">
-          <div class="student-avatar">${escapeHTML(initials)}</div>
           <span>${escapeHTML(student.name)}</span>
         </div>
         ${cells}
@@ -1734,7 +1825,7 @@ function renderUebersicht() {
     </div>
     ${rows}
     <div class="uebersicht-summary">
-      <strong>${completeCount} von ${state.students.length}</strong> Schülern haben alle 4 Förderpläne
+      <strong>${completeCount} von ${activeStudents.length}</strong> Schülern haben alle 4 Förderpläne
     </div>`;
 }
 
@@ -1743,7 +1834,7 @@ function archiveStudent(studentId) {
   const student = state.students.find(s => s.id === studentId);
   if (!student) return;
   student.archived = true;
-  storage.saveData(state.students);
+  storage.saveStudent(student);
   renderStudents();
   renderHomeUebersicht();
   showToast(`"${student.name}" wurde archiviert.`);
@@ -1766,11 +1857,9 @@ function renderArchiv() {
   }
 
   list.innerHTML = archived.map(student => {
-    const initials = student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     return `
       <div class="archiv-entry">
         <div class="student-info">
-          <div class="student-avatar">${escapeHTML(initials)}</div>
           <div class="student-name">${escapeHTML(student.name)}</div>
         </div>
         <div class="archiv-entry-actions">
@@ -1789,7 +1878,7 @@ function renderArchiv() {
       const student = state.students.find(s => s.id === btn.dataset.studentId);
       if (!student) return;
       student.archived = false;
-      storage.saveData(state.students);
+      storage.saveStudent(student);
       renderStudents();
       renderHomeUebersicht();
       renderArchiv();
@@ -1848,7 +1937,7 @@ function openStudentDashboard(studentId) {
 
   state.selectedStudentId = studentId;
   if (state.mode === 'erstellen') state.stammdatenConfirmed = student.stammdatenConfirmed === true;
-  DOM.studentDashboardName.textContent = `Förderpläne: ${student.name}`;
+  DOM.studentDashboardName.textContent = `${student.name} · Förderpläne`;
   renderStudentDashboardTiles(student);
 
   DOM.btnNewFoerderplan.style.display = (state.mode === 'einsehen' || state.mode === 'erstellen') ? 'none' : '';
@@ -2066,6 +2155,10 @@ function setupEventListeners() {
   document.getElementById('home-uebersicht-list').addEventListener('click', (e) => {
     const entry = e.target.closest('[data-student-id]');
     if (!entry) return;
+    if (DOM.homeTileErstellen.classList.contains('home-tile--locked')) {
+      showToast('Förderpläne können nur im festgelegten Zeitraum erstellt werden.', 'error');
+      return;
+    }
     navigateToApp();
     openStudentDashboard(entry.dataset.studentId);
   });
@@ -2080,6 +2173,23 @@ function setupEventListeners() {
   DOM.btnBackFromArchiv.addEventListener('click', () => {
     DOM.archivView.classList.remove('active');
     DOM.verwaltungView.classList.add('active');
+  });
+
+  // Lehrkräfte verwalten
+  DOM.verwaltungTileLehrer.addEventListener('click', navigateToLehrerVerwaltung);
+  DOM.btnBackFromLehrerVerwaltung.addEventListener('click', () => {
+    DOM.lehrerVerwaltungView.classList.remove('active');
+    DOM.verwaltungView.classList.add('active');
+  });
+  document.getElementById('lehrer-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('lehrer-name').value.trim();
+    const email = document.getElementById('lehrer-email').value.trim();
+    if (!name || !email) {
+      document.getElementById('lehrer-error').textContent = 'Bitte Name und E-Mail angeben.';
+      return;
+    }
+    createLehrer(name, email);
   });
   document.getElementById('btn-schueler-archivieren').addEventListener('click', () => {
     const student = state.students.find(s => s.id === state.selectedStudentId);
@@ -2286,7 +2396,9 @@ function setupEventListeners() {
   // Escape key support
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      if (DOM.subjectModal.classList.contains('active')) {
+      if (document.getElementById('pdf-preview-modal').classList.contains('active')) {
+        closePDFPreview();
+      } else if (DOM.subjectModal.classList.contains('active')) {
         closeSubjectModal();
       }
     }
@@ -2294,29 +2406,56 @@ function setupEventListeners() {
 }
 
 // --- Zeitraum Storage & Logic ---
+// Gibt den in state.zeitraum gecachten Zeitraum synchron zurück
+// (wird beim Login via loadZeitraumFromFirestore() befüllt).
 function loadZeitraum() {
+  return state.zeitraum || { schuljahr: {}, foerderplan: {}, elterngespraeche: {} };
+}
+
+// Lädt den Zeitraum der aktuellen Schule aus Firestore in den Cache.
+async function loadZeitraumFromFirestore() {
+  const leer = { schuljahr: {}, foerderplan: {}, elterngespraeche: {} };
   try {
-    const stored = localStorage.getItem('foerderplan_zeitraum');
-    if (!stored) return { schuljahr: {}, foerderplan: {}, elterngespraeche: {} };
-    const parsed = JSON.parse(stored);
-    // Migration: old format was { von, bis }
+    const doc = await zeitraumDocRef().get();
+    if (!doc.exists) {
+      state.zeitraum = leer;
+      return;
+    }
+    const parsed = doc.data();
+    // Migration: altes Format war { von, bis }
     if ('von' in parsed || 'bis' in parsed) {
-      return {
+      state.zeitraum = {
         schuljahr: {},
         foerderplan: { von: parsed.von || null, bis: parsed.bis || null },
         elterngespraeche: {}
       };
+    } else {
+      state.zeitraum = {
+        schuljahr: parsed.schuljahr || {},
+        foerderplan: parsed.foerderplan || {},
+        elterngespraeche: parsed.elterngespraeche || {}
+      };
     }
-    return parsed;
-  } catch(e) { return { schuljahr: {}, foerderplan: {}, elterngespraeche: {} }; }
+  } catch (e) {
+    console.error('Fehler beim Laden des Zeitraums:', e);
+    state.zeitraum = leer;
+  }
 }
 
+// Schreibt den Zeitraum nach Firestore und aktualisiert den Cache.
 function saveZeitraumData(data) {
-  localStorage.setItem('foerderplan_zeitraum', JSON.stringify(data));
+  state.zeitraum = data;
+  return zeitraumDocRef().set(data).catch(e => {
+    console.error('Fehler beim Speichern des Zeitraums:', e);
+    showToast('Fehler beim Speichern des Zeitraums.', 'error');
+  });
 }
 
 function clearZeitraumData() {
-  localStorage.removeItem('foerderplan_zeitraum');
+  state.zeitraum = { schuljahr: {}, foerderplan: {}, elterngespraeche: {} };
+  return zeitraumDocRef().delete().catch(e => {
+    console.error('Fehler beim Löschen des Zeitraums:', e);
+  });
 }
 
 function todayStr() {
@@ -2432,6 +2571,8 @@ function renderFristenTile() {
 function setHeader(text) {
   const el = document.getElementById('logo-text');
   if (el) el.textContent = text;
+  // Blaue Kopfleiste nur auf der Startseite.
+  document.body.classList.toggle('home-active', text === 'Förderplan · Startseite');
 }
 
 // --- Home Navigation ---
@@ -2462,13 +2603,14 @@ function navigateBackFromZeitraum() {
 }
 
 function showHomeView() {
-  setHeader('Förderplan · Assistent');
+  setHeader('Förderplan · Startseite');
   renderHomeUebersicht();
   renderFristenTile();
   updateHomeTileGespraeche();
   setGearButtonVisible(true);
   DOM.homeView.classList.add('active');
   DOM.verwaltungView.classList.remove('active');
+  DOM.lehrerVerwaltungView.classList.remove('active');
   DOM.schuelerVerwaltungView.classList.remove('active');
   DOM.schuelerDetailVerwaltungView.classList.remove('active');
   DOM.zeitraumView.classList.remove('active');
@@ -2490,7 +2632,9 @@ function showHomeView() {
 
 function setGearButtonVisible(visible) {
   const btn = document.getElementById('btn-verwaltung-header');
-  if (btn) btn.style.display = visible ? '' : 'none';
+  // Admins sehen das Zahnrad immer (in jeder Ansicht); Lehrkräfte nie.
+  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+  if (btn) btn.style.display = isAdmin ? '' : 'none';
 }
 
 function navigateToApp() {
@@ -2503,10 +2647,125 @@ function navigateToApp() {
 }
 
 function navigateToVerwaltung() {
+  // Nur Admins dürfen in die Verwaltung.
+  if (!state.currentUser || state.currentUser.role !== 'admin') return;
   setHeader('Förderplan · Verwaltung');
   state.mode = 'verwaltung';
   DOM.homeView.classList.remove('active');
   DOM.verwaltungView.classList.add('active');
+}
+
+// --- Lehrkräfte verwalten (nur Admin) ---
+function navigateToLehrerVerwaltung() {
+  if (!state.currentUser || state.currentUser.role !== 'admin') return;
+  DOM.verwaltungView.classList.remove('active');
+  DOM.lehrerVerwaltungView.classList.add('active');
+  document.getElementById('lehrer-starter-hint').innerHTML =
+    `Neue Lehrkräfte erhalten automatisch das Starter-Passwort <strong>${escapeHTML(STARTER_PASSWORT)}</strong>. Teile es der Lehrkraft mit – beim ersten Login muss sie ein eigenes Passwort festlegen.`;
+  document.getElementById('lehrer-error').textContent = '';
+  renderLehrerListe();
+  setGearButtonVisible(true);
+}
+
+async function renderLehrerListe() {
+  const listEl = document.getElementById('lehrer-liste');
+  listEl.innerHTML = '<div class="lehrer-list-empty">Wird geladen…</div>';
+  try {
+    const snap = await db.collection('users')
+      .where('schoolId', '==', state.currentUser.schoolId).get();
+    const users = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    if (users.length === 0) {
+      listEl.innerHTML = '<div class="lehrer-list-empty">Noch keine Lehrkräfte angelegt.</div>';
+      return;
+    }
+    // Admins zuerst, dann alphabetisch nach Name.
+    users.sort((a, b) => {
+      if ((a.role === 'admin') !== (b.role === 'admin')) return a.role === 'admin' ? -1 : 1;
+      return (a.name || '').localeCompare(b.name || '', 'de');
+    });
+    listEl.innerHTML = users.map(u => {
+      const isSelf = u.uid === state.currentUser.uid;
+      const roleLabel = u.role === 'admin' ? 'Admin' : 'Lehrkraft';
+      const removeBtn = (u.role === 'admin' || isSelf)
+        ? ''
+        : `<button type="button" class="btn-lehrer-remove" data-uid="${escapeHTML(u.uid)}" data-name="${escapeHTML(u.name || u.email || '')}">Entfernen</button>`;
+      return `
+        <div class="lehrer-list-item">
+          <div class="lehrer-list-info">
+            <span class="lehrer-list-name">${escapeHTML(u.name || '(ohne Namen)')}</span>
+            <span class="lehrer-list-email">${escapeHTML(u.email || '')}</span>
+          </div>
+          <div class="lehrer-list-actions">
+            <span class="lehrer-list-role ${u.role === 'admin' ? 'role-admin' : ''}">${roleLabel}</span>
+            ${removeBtn}
+          </div>
+        </div>`;
+    }).join('');
+    listEl.querySelectorAll('.btn-lehrer-remove').forEach(btn => {
+      btn.addEventListener('click', () => removeLehrer(btn.dataset.uid, btn.dataset.name));
+    });
+  } catch (e) {
+    console.error('Fehler beim Laden der Lehrkräfte:', e);
+    listEl.innerHTML = '<div class="lehrer-list-empty">Fehler beim Laden der Lehrkräfte.</div>';
+  }
+}
+
+async function createLehrer(name, email) {
+  const errEl = document.getElementById('lehrer-error');
+  const btn = document.getElementById('btn-lehrer-anlegen');
+  errEl.textContent = '';
+  btn.disabled = true;
+  let secondary = null;
+  try {
+    // Sekundär-App-Instanz: Der neue Nutzer wird dort eingeloggt, der Admin bleibt
+    // in der Haupt-App angemeldet.
+    secondary = firebase.initializeApp(firebaseConfig, 'Secondary-' + Date.now());
+    const cred = await secondary.auth().createUserWithEmailAndPassword(email, STARTER_PASSWORT);
+    await db.collection('users').doc(cred.user.uid).set({
+      email: email,
+      name: name,
+      role: 'lehrer',
+      schoolId: state.currentUser.schoolId,
+      mustChangePassword: true
+    });
+    await secondary.auth().signOut();
+    document.getElementById('lehrer-name').value = '';
+    document.getElementById('lehrer-email').value = '';
+    showToast(`Lehrkraft "${name}" wurde angelegt.`);
+    renderLehrerListe();
+  } catch (err) {
+    console.error('Fehler beim Anlegen der Lehrkraft:', err);
+    errEl.textContent = authErrorMessage(err.code);
+  } finally {
+    if (secondary) { try { await secondary.delete(); } catch (e) { /* ignore */ } }
+    btn.disabled = false;
+  }
+}
+
+function removeLehrer(uid, name) {
+  const doRemove = async () => {
+    try {
+      await db.collection('users').doc(uid).delete();
+      showToast('Lehrkraft wurde entfernt.');
+      renderLehrerListe();
+    } catch (e) {
+      console.error('Fehler beim Entfernen:', e);
+      showToast('Fehler beim Entfernen der Lehrkraft.', 'error');
+    }
+  };
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: 'Lehrkraft entfernen?',
+      text: `"${name}" verliert damit den Zugang zu dieser Schule.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonText: 'Abbrechen',
+      confirmButtonText: 'Entfernen'
+    }).then(result => { if (result.isConfirmed) doRemove(); });
+  } else {
+    doRemove();
+  }
 }
 
 function navigateToSchuelerVerwalten() {
@@ -2546,16 +2805,184 @@ function initDatePickers() {
   fpEgBis = flatpickr(DOM.zeitraumEgBis, options);
 }
 
-// --- Init ---
+// ================= AUTHENTIFIZIERUNG =================
+
+function showLoginView() {
+  document.getElementById('auth-overlay').classList.remove('hidden');
+  document.getElementById('auth-loading').style.display = 'none';
+  document.getElementById('login-view').style.display = '';
+  document.getElementById('passwort-aendern-view').style.display = 'none';
+}
+
+function showPwChangeView() {
+  document.getElementById('auth-overlay').classList.remove('hidden');
+  document.getElementById('auth-loading').style.display = 'none';
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('passwort-aendern-view').style.display = '';
+}
+
+function showAppView() {
+  document.getElementById('auth-overlay').classList.add('hidden');
+}
+
+// Übersetzt Firebase-Fehlercodes in verständliche deutsche Meldungen.
+function authErrorMessage(code) {
+  switch (code) {
+    case 'auth/invalid-email': return 'Ungültige E-Mail-Adresse.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential': return 'E-Mail oder Passwort ist falsch.';
+    case 'auth/too-many-requests': return 'Zu viele Versuche. Bitte später erneut versuchen.';
+    case 'auth/weak-password': return 'Das Passwort muss mindestens 6 Zeichen haben.';
+    case 'auth/email-already-in-use': return 'Diese E-Mail-Adresse wird bereits verwendet.';
+    case 'auth/network-request-failed': return 'Netzwerkfehler. Bitte Internetverbindung prüfen.';
+    case 'auth/requires-recent-login': return 'Bitte melde dich neu an und versuche es erneut.';
+    default: return 'Es ist ein Fehler aufgetreten. Bitte erneut versuchen.';
+  }
+}
+
+// Reagiert auf An-/Abmeldung: steuert Login-Screen vs. App.
+async function handleAuthStateChanged(user) {
+  if (!user) {
+    state.currentUser = null;
+    state.students = [];
+    state.zeitraum = null;
+    showLoginView();
+    return;
+  }
+  try {
+    const doc = await db.collection('users').doc(user.uid).get();
+    if (!doc.exists) {
+      // Konto existiert in Auth, ist aber keiner Schule zugeordnet.
+      await firebase.auth().signOut();
+      document.getElementById('login-error').textContent =
+        'Dieses Konto ist nicht freigeschaltet. Bitte an die Schulleitung wenden.';
+      showLoginView();
+      return;
+    }
+    const data = doc.data();
+    state.currentUser = {
+      uid: user.uid,
+      email: data.email || user.email,
+      name: data.name || '',
+      role: data.role || 'lehrer',
+      schoolId: data.schoolId
+    };
+    if (data.mustChangePassword) {
+      showPwChangeView();
+      return;
+    }
+    await bootApp();
+  } catch (e) {
+    console.error('Fehler bei der Anmeldung:', e);
+    document.getElementById('login-error').textContent =
+      'Fehler beim Laden des Profils. Bitte erneut versuchen.';
+    await firebase.auth().signOut();
+    showLoginView();
+  }
+}
+
+function setupAuthListeners() {
+  // Login
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const pw = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    const btn = document.getElementById('btn-login');
+    errEl.textContent = '';
+    btn.disabled = true;
+    try {
+      await firebase.auth().signInWithEmailAndPassword(email, pw);
+      document.getElementById('login-password').value = '';
+      // handleAuthStateChanged übernimmt den Rest.
+    } catch (err) {
+      errEl.textContent = authErrorMessage(err.code);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // Passwort vergessen
+  document.getElementById('btn-forgot-password').addEventListener('click', async () => {
+    const email = document.getElementById('login-email').value.trim();
+    const errEl = document.getElementById('login-error');
+    if (!email) {
+      errEl.textContent = 'Bitte zuerst die E-Mail-Adresse oben eingeben.';
+      return;
+    }
+    try {
+      await firebase.auth().sendPasswordResetEmail(email);
+      errEl.textContent = '';
+      showToast('E-Mail zum Zurücksetzen des Passworts wurde gesendet.');
+    } catch (err) {
+      errEl.textContent = authErrorMessage(err.code);
+    }
+  });
+
+  // Erzwungener Passwort-Wechsel beim ersten Login
+  document.getElementById('pw-change-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pw1 = document.getElementById('pw-neu').value;
+    const pw2 = document.getElementById('pw-neu-bestaetigung').value;
+    const errEl = document.getElementById('pw-change-error');
+    const btn = document.getElementById('btn-pw-change');
+    errEl.textContent = '';
+    if (pw1.length < 6) { errEl.textContent = 'Das Passwort muss mindestens 6 Zeichen haben.'; return; }
+    if (pw1 !== pw2) { errEl.textContent = 'Die Passwörter stimmen nicht überein.'; return; }
+    if (pw1 === STARTER_PASSWORT) { errEl.textContent = 'Bitte wähle ein anderes als das Starter-Passwort.'; return; }
+    btn.disabled = true;
+    try {
+      await firebase.auth().currentUser.updatePassword(pw1);
+      await db.collection('users').doc(state.currentUser.uid).update({ mustChangePassword: false });
+      document.getElementById('pw-neu').value = '';
+      document.getElementById('pw-neu-bestaetigung').value = '';
+      await bootApp();
+    } catch (err) {
+      errEl.textContent = authErrorMessage(err.code);
+      btn.disabled = false;
+    }
+  });
+
+  // Abmelden
+  document.getElementById('btn-logout-header').addEventListener('click', async () => {
+    await firebase.auth().signOut();
+    // handleAuthStateChanged zeigt den Login-Screen; App-Ansicht zurücksetzen.
+    showHomeView();
+  });
+}
+
+// Stellt die UI passend zur Rolle ein.
+function applyRoleUI() {
+  // Zahnrad/Verwaltung nur für Admins (setGearButtonVisible prüft die Rolle selbst).
+  setGearButtonVisible(true);
+}
+
+// ================= INIT / BOOT =================
+let datePickersReady = false;
+
+// Einmalige Einrichtung; wartet auf den Auth-Status.
 function init() {
-  state.students = storage.loadData();
+  db = firebase.firestore();
   setupEventListeners();
+  setupAuthListeners();
+  firebase.auth().onAuthStateChanged(handleAuthStateChanged);
+}
+
+// Läuft nach erfolgreichem Login (und ggf. Passwortwechsel): lädt Schul-Daten.
+async function bootApp() {
+  state.students = await storage.loadData();
+  await loadZeitraumFromFirestore();
   renderStudents();
   updateHomeTileErstellen();
   updateHomeTileGespraeche();
-  initDatePickers();
+  if (!datePickersReady) { initDatePickers(); datePickersReady = true; }
   renderHomeUebersicht();
   renderFristenTile();
+  applyRoleUI();
+  // Boot landet auf der Startseite → blaue Kopfleiste aktivieren.
+  document.body.classList.add('home-active');
+  showAppView();
 }
 
 document.addEventListener('DOMContentLoaded', init);

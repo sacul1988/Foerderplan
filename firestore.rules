@@ -1,0 +1,73 @@
+rules_version = '2';
+
+// Firestore Security Rules für den Förderplan-Assistenten (Multi-Schul-Modell).
+// Einspielen: Firebase-Konsole → Firestore Database → Regeln → einfügen → Veröffentlichen.
+//
+// Datenmodell:
+//   users/{uid}                              { email, name, role, schoolId, mustChangePassword }
+//   schools/{schoolId}                       { name, ... }         (per Konsole angelegt)
+//   schools/{schoolId}/students/{studentId}  Schülerdaten
+//   schools/{schoolId}/meta/{docId}          z.B. "zeitraum"
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Profil des aktuell angemeldeten Nutzers.
+    function myUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function mySchool() {
+      return myUser().schoolId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && myUser().role == 'admin';
+    }
+
+    // ---- Nutzerprofile ----
+    match /users/{uid} {
+      // Eigenes Profil lesen; Admins lesen alle Profile ihrer Schule.
+      allow read: if isSignedIn() && (
+        request.auth.uid == uid ||
+        (isAdmin() && resource.data.schoolId == mySchool())
+      );
+
+      // Admin darf Lehrkräfte seiner eigenen Schule anlegen.
+      allow create: if isAdmin() &&
+        request.resource.data.schoolId == mySchool() &&
+        request.resource.data.role == 'lehrer';
+
+      // Eigenes Profil aktualisieren (z.B. mustChangePassword) – Rolle und Schule bleiben fix.
+      allow update: if isSignedIn() && request.auth.uid == uid &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.schoolId == resource.data.schoolId;
+
+      // Admin darf Lehrkräfte seiner Schule entfernen (keine Admins, nicht sich selbst).
+      allow delete: if isAdmin() &&
+        resource.data.schoolId == mySchool() &&
+        resource.data.role == 'lehrer';
+    }
+
+    // ---- Schul-Daten ----
+    match /schools/{schoolId} {
+      // Das Schul-Dokument selbst wird per Konsole gepflegt; lesen für die eigene Schule erlaubt.
+      allow read: if isSignedIn() && mySchool() == schoolId;
+      allow write: if false;
+
+      // Schülerdaten: nur Nutzer derselben Schule.
+      match /students/{studentId} {
+        allow read, write: if isSignedIn() && mySchool() == schoolId;
+      }
+
+      // Einstellungen/Zeiträume: nur Nutzer derselben Schule.
+      match /meta/{docId} {
+        allow read, write: if isSignedIn() && mySchool() == schoolId;
+      }
+    }
+  }
+}

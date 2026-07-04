@@ -1,0 +1,9 @@
+# Lokale Firebase-Konfiguration mit echtem Starter-Passwort – NICHT einchecken.
+# Vorlage: firebase-config.example.js
+firebase-config.js
+
+# macOS
+.DS_Store
+
+# Backups / temporäre Dateien
+*.bak
