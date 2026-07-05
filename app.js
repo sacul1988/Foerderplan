@@ -793,6 +793,7 @@ function openWorkspace(subject) {
   DOM.goalsWorkspaceView.classList.add('active');
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  pushNavState();
 }
 
 function closeWorkspace(preserveDraft = false) {
@@ -1545,6 +1546,7 @@ function openSubjectDetailView(subject) {
   DOM.studentDashboardView.classList.remove('active');
   DOM.subjectDetailView.classList.add('active');
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  pushNavState();
 }
 
 function closeSubjectDetailView() {
@@ -1710,6 +1712,7 @@ function openStammdatenEdit(origin = 'dashboard') {
   DOM.studentDashboardView.classList.remove('active');
   DOM.schuelerAnlegenView.classList.add('active');
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  pushNavState();
 }
 
 function parseDEDate(str) {
@@ -1767,7 +1770,7 @@ function saveStammdatenEdit() {
   const student = state.students[idx];
   if (state.stammdatenEditOrigin === 'verwaltung') {
     state.stammdatenEditOrigin = null;
-    openSchuelerDetailVerwaltung(student.id);
+    openSchuelerDetailVerwaltung(student.id, false);
   } else {
     DOM.studentDashboardName.textContent = `${student.name} · Förderpläne`;
     renderStudentDashboardTiles(student);
@@ -1813,6 +1816,7 @@ function navigateToSchuelerAnlegen() {
   setGearButtonVisible(true);
   DOM.schuelerVerwaltungView.classList.remove('active');
   DOM.schuelerAnlegenView.classList.add('active');
+  pushNavState();
 }
 
 function saveNeuerSchueler() {
@@ -1929,6 +1933,7 @@ function navigateToUebersicht() {
   DOM.verwaltungView.classList.remove('active');
   DOM.uebersichtView.classList.add('active');
   setGearButtonVisible(true);
+  pushNavState();
 }
 
 function renderUebersicht() {
@@ -2012,6 +2017,7 @@ function navigateToArchiv() {
   DOM.verwaltungView.classList.remove('active');
   DOM.archivView.classList.add('active');
   setGearButtonVisible(true);
+  pushNavState();
 }
 
 // Sichert alle Schülerdaten + Zeiträume der Schule als JSON-Datei (lokaler Download).
@@ -2108,7 +2114,9 @@ function renderArchiv() {
 }
 
 // --- Schüler Verwaltungs-Dashboard ---
-function openSchuelerDetailVerwaltung(studentId) {
+// isForward=false, wenn wir aus der Stammdaten-Bearbeitung hierher ZURÜCKkehren
+// (dann keinen neuen History-Eintrag anlegen).
+function openSchuelerDetailVerwaltung(studentId, isForward = true) {
   const student = state.students.find(s => s.id === studentId);
   if (!student) return;
   state.selectedStudentId = studentId;
@@ -2119,6 +2127,7 @@ function openSchuelerDetailVerwaltung(studentId) {
   DOM.schuelerDetailVerwaltungView.classList.add('active');
   setGearButtonVisible(true);
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (isForward) pushNavState();
 }
 
 // --- Student Dashboard ---
@@ -2141,6 +2150,7 @@ function openStudentDashboard(studentId) {
   DOM.dashboardGrid.classList.add('hidden');
   DOM.studentDashboardView.classList.add('active');
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  pushNavState();
 }
 
 function closeStudentDashboard() {
@@ -2263,7 +2273,7 @@ function setupEventListeners() {
       DOM.schuelerAnlegenView.classList.remove('active');
       if (state.stammdatenEditOrigin === 'verwaltung') {
         state.stammdatenEditOrigin = null;
-        openSchuelerDetailVerwaltung(state.selectedStudentId);
+        openSchuelerDetailVerwaltung(state.selectedStudentId, false);
       } else {
         DOM.studentDashboardView.classList.add('active');
       }
@@ -2716,6 +2726,7 @@ function navigateToSchuelerVerwaltung() {
   DOM.verwaltungView.classList.remove('active');
   DOM.schuelerVerwaltungView.classList.add('active');
   setGearButtonVisible(true);
+  pushNavState();
 }
 
 function navigateToZeitraum() {
@@ -2731,6 +2742,7 @@ function navigateToZeitraum() {
   DOM.verwaltungView.classList.remove('active');
   DOM.zeitraumView.classList.add('active');
   setGearButtonVisible(true);
+  pushNavState();
 }
 
 function navigateBackFromZeitraum() {
@@ -2780,6 +2792,7 @@ function navigateToApp() {
   DOM.dashboardGrid.classList.add('einsehen-mode');
   DOM.dashboardGrid.classList.remove('hidden');
   setGearButtonVisible(false);
+  pushNavState();
 }
 
 function navigateToVerwaltung() {
@@ -2789,6 +2802,7 @@ function navigateToVerwaltung() {
   state.mode = 'verwaltung';
   DOM.homeView.classList.remove('active');
   DOM.verwaltungView.classList.add('active');
+  pushNavState();
 }
 
 // --- Lehrkräfte verwalten (nur Admin) ---
@@ -2801,6 +2815,7 @@ function navigateToLehrerVerwaltung() {
   document.getElementById('lehrer-error').textContent = '';
   renderLehrerListe();
   setGearButtonVisible(true);
+  pushNavState();
 }
 
 async function renderLehrerListe() {
@@ -2910,6 +2925,7 @@ function navigateToSchuelerVerwalten() {
   DOM.dashboardGrid.classList.add('einsehen-mode');
   DOM.dashboardGrid.classList.remove('hidden');
   setGearButtonVisible(state.mode === 'verwaltung');
+  pushNavState();
 }
 
 function navigateToEinsehen() {
@@ -2919,6 +2935,7 @@ function navigateToEinsehen() {
   DOM.dashboardGrid.classList.add('einsehen-mode');
   DOM.dashboardGrid.classList.remove('hidden');
   setGearButtonVisible(false);
+  pushNavState();
 }
 
 // --- Flatpickr Date Pickers ---
@@ -3117,6 +3134,7 @@ function init() {
   setupEventListeners();
   setupAuthListeners();
   setupConnectivityWatch();
+  setupHistoryNavigation();
   firebase.auth().onAuthStateChanged(handleAuthStateChanged);
 }
 
@@ -3130,6 +3148,40 @@ function setupConnectivityWatch() {
   window.addEventListener('online', update);
   window.addEventListener('offline', update);
   update();
+}
+
+// ============ Browser-Zurück-Taste (History-Integration) ============
+// Jede Vorwärts-Navigation legt einen History-Eintrag an. Drückt man die
+// Browser-Zurück-Taste, wird die zur aktuell sichtbaren Ansicht passende
+// „Zurück"-Aktion ausgeführt (dieselbe wie der jeweilige Zurück-Button).
+function pushNavState() {
+  history.pushState({ app: true }, '');
+}
+
+// Liefert die „Zurück"-Aktion für die aktuell sichtbare Ansicht (oder null auf der Startseite).
+function currentBackAction() {
+  if (DOM.subjectDetailView.classList.contains('active'))            return () => DOM.btnBackFromDetail.click();
+  if (DOM.goalsWorkspaceView.classList.contains('active'))          return () => DOM.btnBackToDashboard.click();
+  if (DOM.schuelerAnlegenView.classList.contains('active'))         return () => DOM.btnBackFromSchuelerAnlegen.click();
+  if (DOM.schuelerDetailVerwaltungView.classList.contains('active')) return () => DOM.btnBackFromSchuelerDetail.click();
+  if (DOM.studentDashboardView.classList.contains('active'))        return () => DOM.btnBackFromStudentDashboard.click();
+  if (!DOM.dashboardGrid.classList.contains('hidden'))             return () => DOM.btnBackFromList.click();
+  if (DOM.lehrerVerwaltungView.classList.contains('active'))        return () => DOM.btnBackFromLehrerVerwaltung.click();
+  if (DOM.zeitraumView.classList.contains('active'))               return () => DOM.btnBackFromZeitraum.click();
+  if (DOM.uebersichtView.classList.contains('active'))             return () => DOM.btnBackFromUebersicht.click();
+  if (DOM.archivView.classList.contains('active'))                 return () => DOM.btnBackFromArchiv.click();
+  if (DOM.schuelerVerwaltungView.classList.contains('active'))     return () => DOM.btnBackFromSchuelerVerwaltung.click();
+  if (DOM.verwaltungView.classList.contains('active'))             return () => showHomeView();
+  return null;
+}
+
+function setupHistoryNavigation() {
+  window.addEventListener('popstate', () => {
+    // Nur reagieren, wenn eingeloggt und die App sichtbar ist.
+    if (!state.currentUser) return;
+    const back = currentBackAction();
+    if (back) back();
+  });
 }
 
 // Läuft nach erfolgreichem Login (und ggf. Passwortwechsel): lädt Schul-Daten.
