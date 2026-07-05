@@ -2980,6 +2980,7 @@ function authErrorMessage(code) {
 // Reagiert auf An-/Abmeldung: steuert Login-Screen vs. App.
 async function handleAuthStateChanged(user) {
   if (!user) {
+    stopStudentsSubscription();
     state.currentUser = null;
     state.students = [];
     state.zeitraum = null;
@@ -3096,6 +3097,7 @@ function applyRoleUI() {
 
 // ================= INIT / BOOT =================
 let datePickersReady = false;
+let unsubscribeStudents = null;
 
 // Einmalige Einrichtung; wartet auf den Auth-Status.
 function init() {
@@ -3132,10 +3134,10 @@ function setupConnectivityWatch() {
 
 // Läuft nach erfolgreichem Login (und ggf. Passwortwechsel): lädt Schul-Daten.
 async function bootApp() {
-  state.students = await storage.loadData();
   await loadZeitraumFromFirestore();
   await loadSchoolName();
-  renderStudents();
+  // Live-Sync: füllt state.students und rendert bei jeder Änderung neu (wartet auf ersten Stand).
+  await subscribeStudents();
   updateHomeTileErstellen();
   updateHomeTileGespraeche();
   if (!datePickersReady) { initDatePickers(); datePickersReady = true; }
@@ -3143,6 +3145,53 @@ async function bootApp() {
   renderFristenTile();
   applyRoleUI();
   showAppView();
+}
+
+// Echtzeit-Abo der Schülerliste. Aktualisiert state.students live und rendert passive
+// Ansichten neu; offene Formulare/der Workspace werden dabei bewusst NICHT angetastet.
+function subscribeStudents() {
+  return new Promise((resolve) => {
+    if (unsubscribeStudents) { unsubscribeStudents(); unsubscribeStudents = null; }
+    let first = true;
+    const done = () => { if (first) { first = false; resolve(); } };
+    unsubscribeStudents = studentsCollection().onSnapshot(
+      (snap) => {
+        state.students = snap.docs.map(doc => normalizeStudent({ ...doc.data(), id: doc.id }));
+        applyLiveStudentUpdate();
+        done();
+      },
+      (err) => {
+        console.error('Live-Sync Fehler:', err);
+        showToast('Live-Aktualisierung unterbrochen. Bitte Seite neu laden.', 'error');
+        done();
+      }
+    );
+  });
+}
+
+// Rendert nur die sicheren, passiven Ansichten neu (sie schreiben in eigene Container).
+// Formular „Schüler anlegen/bearbeiten" und der Förderplan-Workspace werden NICHT berührt.
+function applyLiveStudentUpdate() {
+  renderStudents();
+  renderHomeUebersicht();
+  renderFristenTile();
+  updateHomeTileErstellen();
+  updateHomeTileGespraeche();
+  // Verwaltungs-Detailansicht (read-only) live aktualisieren, wenn gerade geöffnet.
+  if (DOM.schuelerDetailVerwaltungView &&
+      DOM.schuelerDetailVerwaltungView.classList.contains('active') &&
+      state.selectedStudentId) {
+    const s = state.students.find(x => x.id === state.selectedStudentId);
+    if (s) {
+      renderStammdatenInTile(s, document.getElementById('tile-stammdaten-verwaltung-body'));
+      renderHistoryPdfList(s, document.getElementById('tile-foerderplaene-verwaltung-body'));
+    }
+  }
+}
+
+// Beendet das Live-Abo (z. B. beim Abmelden).
+function stopStudentsSubscription() {
+  if (unsubscribeStudents) { unsubscribeStudents(); unsubscribeStudents = null; }
 }
 
 // Lädt den Anzeigenamen der Schule (für PDF-Kopf). Fehlerhaft/leer → schoolId als Fallback.
