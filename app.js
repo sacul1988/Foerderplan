@@ -3098,11 +3098,26 @@ function setupAuthListeners() {
     }
   });
 
-  // Abmelden
-  document.getElementById('btn-logout-header').addEventListener('click', async () => {
-    await firebase.auth().signOut();
-    // handleAuthStateChanged zeigt den Login-Screen; App-Ansicht zurücksetzen.
-    showHomeView();
+  // Abmelden (mit Sicherheitsabfrage)
+  document.getElementById('btn-logout-header').addEventListener('click', () => {
+    const doLogout = async () => {
+      await firebase.auth().signOut();
+      // handleAuthStateChanged zeigt den Login-Screen; App-Ansicht zurücksetzen.
+      showHomeView();
+    };
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        title: 'Abmelden?',
+        text: 'Möchten Sie sich wirklich abmelden?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#334155',
+        cancelButtonText: 'Abbrechen',
+        confirmButtonText: 'Abmelden'
+      }).then(result => { if (result.isConfirmed) doLogout(); });
+    } else {
+      doLogout();
+    }
   });
 }
 
